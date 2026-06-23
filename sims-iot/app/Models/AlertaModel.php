@@ -4,6 +4,12 @@ namespace App\Models;
 
 use CodeIgniter\Model;
 
+/**
+ * AlertaModel
+ * 
+ * Gestiona las alertas generadas automáticamente por el sistema
+ * cuando los valores de los sensores superan los umbrales definidos.
+ */
 class AlertaModel extends Model
 {
     protected $table            = 'alertas';
@@ -12,39 +18,60 @@ class AlertaModel extends Model
     protected $returnType       = 'array';
     protected $useSoftDeletes   = false;
     protected $protectFields    = true;
-    protected $allowedFields    = [
+
+    protected $allowedFields = [
         'mensaje',
-        'nivel',
-        'fecha'
+        'nivel',   // 'bajo' | 'medio' | 'alto'
+        'fecha',
     ];
 
-    protected bool $allowEmptyInserts = false;
-    protected bool $updateOnlyChanged = true;
-
-    protected array $casts = [];
-    protected array $castHandlers = [];
-
-    // Dates
     protected $useTimestamps = false;
-    protected $dateFormat    = 'datetime';
-    protected $createdField  = 'created_at';
-    protected $updatedField  = 'updated_at';
-    protected $deletedField  = 'deleted_at';
 
-    // Validation
-    protected $validationRules      = [];
-    protected $validationMessages   = [];
-    protected $skipValidation       = false;
-    protected $cleanValidationRules = true;
+    protected $validationRules = [
+        'mensaje' => 'required|min_length[5]|max_length[255]',
+        'nivel'   => 'required|in_list[bajo,medio,alto]',
+    ];
 
-    // Callbacks
-    protected $allowCallbacks = true;
-    protected $beforeInsert   = [];
-    protected $afterInsert    = [];
-    protected $beforeUpdate   = [];
-    protected $afterUpdate    = [];
-    protected $beforeFind     = [];
-    protected $afterFind      = [];
-    protected $beforeDelete   = [];
-    protected $afterDelete    = [];
+    // ──────────────────────────────────────────────────────────────────────
+    // CONSULTAS PERSONALIZADAS
+    // ──────────────────────────────────────────────────────────────────────
+
+    /**
+     * Obtener alertas recientes ordenadas por fecha descendente.
+     */
+    public function getAlertasRecientes(int $limit = 20): array
+    {
+        return $this->orderBy('fecha', 'DESC')
+                    ->limit($limit)
+                    ->findAll();
+    }
+
+    /**
+     * Eliminar alertas con más de N días de antigüedad.
+     */
+    public function limpiarAnteriores(int $dias = 30): int
+    {
+        $db = \Config\Database::connect();
+
+        $db->query("DELETE FROM alertas WHERE fecha < DATE_SUB(NOW(), INTERVAL {$dias} DAY)");
+
+        return $db->affectedRows();
+    }
+
+    /**
+     * Contar alertas por nivel en las últimas 24 horas.
+     */
+    public function contarPorNivel(): array
+    {
+        $db = \Config\Database::connect();
+
+        $query = $db->query("
+            SELECT nivel, COUNT(*) AS total
+            FROM alertas
+            WHERE fecha >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+            GROUP BY nivel
+        ");
+
+        return $query->getResultArray();
+    }
 }
