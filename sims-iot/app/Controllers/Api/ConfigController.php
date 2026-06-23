@@ -6,164 +6,113 @@ use App\Controllers\BaseController;
 use App\Services\AlertaService;
 use CodeIgniter\HTTP\ResponseInterface;
 
-/**
- * ConfigController
- * 
- * Permite al usuario configurar umbrales de alerta.
- * El ESP32 también consulta estos umbrales para ajustar su comportamiento.
- * 
- * GET  /api/config           → ESP32 obtiene umbrales actuales
- * POST /api/config/umbrales  → Usuario actualiza los umbrales
- */
-class ConfigController extends BaseController
-{
-    protected AlertaService $alertaService;
-
-    // Umbrales almacenados en sesión/archivo de configuración
-    // En producción se pueden guardar en una tabla `configuracion` de MySQL
-    private array $umbralesDefault = [
-        'temperatura_max' => 28.0,
-        'temperatura_min' => 16.0,
-        'humedad_max'     => 70.0,
-        'humedad_min'     => 30.0,
-        'ruido_max'       => 40.0,
-    ];
-
-    public function __construct()
+   
+    class ConfigController extends BaseController
     {
-        $this->alertaService = new AlertaService();
-    }
+        protected AlertaService $alertaService;
 
-    // ──────────────────────────────────────────────────────────────────────
-    // GET /api/config
-    // ──────────────────────────────────────────────────────────────────────
+        // Umbrales almacenados en sesión/archivo de configuración
+        private array $umbralesDefault = [
+            'temperatura_max' => 28.0,
+            'temperatura_min' => 16.0,
+            'humedad_max'     => 70.0,
+            'humedad_min'     => 30.0,
+            'ruido_max'       => 40.0,
+        ];
 
-    /**
-     * El ESP32 llama a este endpoint al iniciar para recibir
-     * los umbrales de alerta configurados por el usuario.
-     *
-     * Respuesta:
-     * {
-     *   "temperatura_max": 28,
-     *   "temperatura_min": 16,
-     *   "humedad_max":     70,
-     *   "humedad_min":     30,
-     *   "ruido_max":       40
-     * }
-     */
-    public function index(): ResponseInterface
-    {
-        $umbrales = $this->getUmbralesActuales();
+        public function __construct()
+        {
+            $this->alertaService = new AlertaService();
+        }
 
-        return $this->responder(200, $umbrales);
-    }
+        public function index(): ResponseInterface
+        {
+            $umbrales = $this->getUmbralesActuales();
 
-    // ──────────────────────────────────────────────────────────────────────
-    // POST /api/config/umbrales
-    // ──────────────────────────────────────────────────────────────────────
+            return $this->responder(200, $umbrales);
+        }
 
-    /**
-     * El usuario envía nuevos umbrales desde el dashboard.
-     *
-     * Body esperado:
-     * {
-     *   "temperatura_max": 26,
-     *   "ruido_max": 35
-     * }
-     *
-     * Solo se actualizan los campos enviados (PATCH semántico vía POST).
-     */
-    public function actualizarUmbrales(): ResponseInterface
+        
+        public function actualizarUmbrales(): ResponseInterface
     {
         $json = $this->request->getJSON(true);
 
         if (empty($json)) {
             return $this->responder(400, [
-                'status'  => 'error',
+                'status' => 'error',
                 'mensaje' => 'No se recibieron datos JSON.',
             ]);
         }
 
-        $camposPermitidos = [
-            'temperatura_max', 'temperatura_min',
-            'humedad_max',     'humedad_min',
-            'ruido_max',
-        ];
+        $db = \Config\Database::connect();
 
-        $db      = \Config\Database::connect();
-        $errores = [];
+            $data = [];
 
-        foreach ($json as $campo => $valor) {
-            if (!in_array($campo, $camposPermitidos)) {
-                $errores[] = "Campo no permitido: {$campo}";
-                continue;
-            }
-
-            if (!is_numeric($valor)) {
-                $errores[] = "El campo {$campo} debe ser numérico.";
-                continue;
-            }
-
-            // Upsert en la tabla `configuracion` (clave → valor)
-            $existente = $db->table('configuracion')->where('clave', $campo)->get()->getRowArray();
-
-            if ($existente) {
-                $db->table('configuracion')->where('clave', $campo)->update(['valor' => $valor]);
-            } else {
-                $db->table('configuracion')->insert(['clave' => $campo, 'valor' => $valor]);
-            }
+        if (isset($json['temp_min'])) {
+            $data['temp_min'] = $json['temp_min'];
         }
 
-        if (!empty($errores)) {
-            return $this->responder(422, [
-                'status'  => 'error',
-                'mensaje' => 'Algunos campos no se procesaron.',
-                'errores' => $errores,
-            ]);
+        if (isset($json['temp_max'])) {
+            $data['temp_max'] = $json['temp_max'];
         }
+
+        if (isset($json['hum_min'])) {
+            $data['hum_min'] = $json['hum_min'];
+        }
+
+        if (isset($json['hum_max'])) {
+            $data['hum_max'] = $json['hum_max'];
+        }
+
+        if (isset($json['ruido_max'])) {
+            $data['ruido_max'] = $json['ruido_max'];
+        }
+        if (isset($json['mov_max'])) {
+            $data['mov_max'] = $json['mov_max'];
+        }
+
+            if (empty($data)) {
+                return $this->responder(422, [
+                    'status' => 'error',
+                    'mensaje' => 'No hay campos válidos para actualizar.',
+                ]);
+            }
+
+        $db->table('configuraciones')
+            ->where('id', 1)
+            ->update($data);
 
         return $this->responder(200, [
-            'status'   => 'ok',
-            'mensaje'  => 'Umbrales actualizados correctamente.',
-            'umbrales' => $this->getUmbralesActuales(),
+            'status' => 'ok',
+            'mensaje' => 'Umbrales actualizados correctamente.',
         ]);
     }
 
-    // ──────────────────────────────────────────────────────────────────────
-    // Helpers
-    // ──────────────────────────────────────────────────────────────────────
-
-    /**
-     * Lee los umbrales desde la BD o usa los defaults si no existen.
-     */
     private function getUmbralesActuales(): array
     {
         $db = \Config\Database::connect();
 
-        // Verificar si la tabla existe antes de consultar
-        try {
-            $rows = $db->table('configuracion')->get()->getResultArray();
-        } catch (\Throwable $e) {
-            return $this->umbralesDefault;
+        $row = $db->table('configuraciones')->where('id', 1)->get()->getRowArray();
+
+        if (!$row) {
+            return [
+                'temperatura_minima' => 18,
+                'temperatura_maxima' => 28,
+                'humedad_minima' => 30,
+                'humedad_maxima' => 70,
+                'ruido_maximo' => 40,
+                'movimiento_maximo' => 10,
+            ];
         }
 
-        if (empty($rows)) {
-            return $this->umbralesDefault;
-        }
-
-        $umbrales = $this->umbralesDefault;
-        foreach ($rows as $row) {
-            $umbrales[$row['clave']] = (float)$row['valor'];
-        }
-
-        return $umbrales;
+        return $row;
     }
 
-    private function responder(int $codigo, mixed $data): ResponseInterface
-    {
-        return $this->response
-            ->setStatusCode($codigo)
-            ->setContentType('application/json')
-            ->setJSON($data);
+        private function responder(int $codigo, mixed $data): ResponseInterface
+        {
+            return $this->response
+                ->setStatusCode($codigo)
+                ->setContentType('application/json')
+                ->setJSON($data);
+        }
     }
-}

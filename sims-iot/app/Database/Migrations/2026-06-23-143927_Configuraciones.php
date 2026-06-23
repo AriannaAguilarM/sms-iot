@@ -13,43 +13,42 @@ class Configuraciones extends Migration
             'id' => [
                 'type'           => 'INT',
                 'unsigned'       => true,
-                'auto_increment' => true
+                'auto_increment' => true,
             ],
 
-            'temperatura_minima' => [
-                'type' => 'FLOAT',
-                'default' => 18
+            'temp_min' => [
+                'type'    => 'FLOAT',
+                'default' => 18,
             ],
 
-            'temperatura_maxima' => [
-                'type' => 'FLOAT',
-                'default' => 24
+            'temp_max' => [
+                'type'    => 'FLOAT',
+                'default' => 24,
             ],
 
-            'humedad_minima' => [
-                'type' => 'FLOAT',
-                'default' => 40
+            'hum_min' => [
+                'type'    => 'FLOAT',
+                'default' => 40,
             ],
 
-            'humedad_maxima' => [
-                'type' => 'FLOAT',
-                'default' => 60
+            'hum_max' => [
+                'type'    => 'FLOAT',
+                'default' => 60,
             ],
 
-            'ruido_maximo' => [
-                'type' => 'FLOAT',
-                'default' => 40
+            'ruido_max' => [
+                'type'    => 'FLOAT',
+                'default' => 40,
             ],
 
-            'movimiento_maximo' => [
-                'type' => 'INT',
-                'default' => 10
-            ]
+            'mov_max' => [
+                'type'    => 'INT',
+                'default' => 10,
+            ],
 
         ]);
 
         $this->forge->addKey('id', true);
-
         $this->forge->createTable('configuraciones');
     }
 
