@@ -21,13 +21,13 @@
                     <div class="col-md-6">
                         <label class="form-label-iot">Temperatura mínima</label>
                         <input type="number" step="0.5" class="form-control form-control-iot" 
-                               id="cfg-temp-min" placeholder="Ej: 18">
+                               id="temp_min" placeholder="Ej: 18">
                         <small class="text-secondary">°C - Por debajo de este valor se genera alerta</small>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label-iot">Temperatura máxima</label>
                         <input type="number" step="0.5" class="form-control form-control-iot" 
-                               id="cfg-temp-max" placeholder="Ej: 26">
+                               id="temp_max" placeholder="Ej: 26">
                         <small class="text-secondary">°C - Por encima de este valor se genera alerta</small>
                     </div>
                 </div>
@@ -36,13 +36,13 @@
                     <div class="col-md-6">
                         <label class="form-label-iot">Humedad mínima</label>
                         <input type="number" step="1" class="form-control form-control-iot" 
-                               id="cfg-hum-min" placeholder="Ej: 30">
+                               id="hum_min" placeholder="Ej: 30">
                         <small class="text-secondary">% - Por debajo de este valor se genera alerta</small>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label-iot">Humedad máxima</label>
                         <input type="number" step="1" class="form-control form-control-iot" 
-                               id="cfg-hum-max" placeholder="Ej: 70">
+                               id="hum_max" placeholder="Ej: 70">
                         <small class="text-secondary">% - Por encima de este valor se genera alerta</small>
                     </div>
                 </div>
@@ -51,14 +51,14 @@
                     <div class="col-md-6">
                         <label class="form-label-iot">Ruido máximo</label>
                         <input type="number" step="1" class="form-control form-control-iot" 
-                               id="cfg-ruido-max" placeholder="Ej: 40">
+                               id="ruido_max" placeholder="Ej: 40">
                         <small class="text-secondary">dB - Por encima de este valor se genera alerta</small>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label-iot">ICS mínimo</label>
+                        <label class="form-label-iot">Movimiento máximo</label>
                         <input type="number" step="1" class="form-control form-control-iot" 
-                               id="cfg-ics-min" placeholder="Ej: 60">
-                        <small class="text-secondary">/100 - Por debajo de este valor se genera alerta</small>
+                               id="mov_max" placeholder="Ej: 10">
+                        <small class="text-secondary">eventos - Por encima de este valor se genera alerta</small>
                     </div>
                 </div>
 
@@ -82,10 +82,11 @@
             <div class="text-secondary small">
                 <p><strong>Umbrales recomendados:</strong></p>
                 <ul class="list-unstyled">
-                    <li>🌡️ Temperatura: 18°C - 26°C</li>
-                    <li>💧 Humedad: 30% - 70%</li>
-                    <li>🔊 Ruido: &lt; 40 dB</li>
-                    <li>⭐ ICS: ≥ 60</li>
+                    <li>🌡️ Temperatura: <span id="info-temp">18°C - 26°C</span></li>
+                    <li>💧 Humedad: <span id="info-hum">30% - 70%</span></li>
+                    <li>🔊 Ruido: <span id="info-ruido">&lt; 40 dB</span></li>
+                    <li>🌀 Movimiento: <span id="info-mov">&lt; 10 eventos</span></li>
+                    <li>⭐ ICS: <span id="info-ics">≥ 60/100</span></li>
                 </ul>
                 <hr class="border-secondary border-opacity-25">
                 <p class="mb-0">
@@ -116,12 +117,19 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const cfg = await response.json();
             
-            document.getElementById('cfg-temp-min').value = cfg.temperatura_min || '';
-            document.getElementById('cfg-temp-max').value = cfg.temperatura_max || '';
-            document.getElementById('cfg-hum-min').value = cfg.humedad_min || '';
-            document.getElementById('cfg-hum-max').value = cfg.humedad_max || '';
-            document.getElementById('cfg-ruido-max').value = cfg.ruido_max || '';
-            document.getElementById('cfg-ics-min').value = cfg.indice_sueno_min || '';
+            // Mapear campos directamente
+            document.getElementById('temp_min').value = cfg.temp_min || '';
+            document.getElementById('temp_max').value = cfg.temp_max || '';
+            document.getElementById('hum_min').value = cfg.hum_min || '';
+            document.getElementById('hum_max').value = cfg.hum_max || '';
+            document.getElementById('ruido_max').value = cfg.ruido_max || '';
+            document.getElementById('mov_max').value = cfg.mov_max || '';
+            
+            // Actualizar información
+            document.getElementById('info-temp').textContent = `${cfg.temp_min}°C - ${cfg.temp_max}°C`;
+            document.getElementById('info-hum').textContent = `${cfg.hum_min}% - ${cfg.hum_max}%`;
+            document.getElementById('info-ruido').textContent = `< ${cfg.ruido_max} dB`;
+            document.getElementById('info-mov').textContent = `< ${cfg.mov_max} eventos`;
             
             document.getElementById('config-update').textContent = 
                 new Date().toLocaleString('es-MX');
@@ -145,12 +153,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
         try {
             const payload = {
-                temperatura_min: parseFloat(document.getElementById('cfg-temp-min').value) || null,
-                temperatura_max: parseFloat(document.getElementById('cfg-temp-max').value) || null,
-                humedad_min: parseFloat(document.getElementById('cfg-hum-min').value) || null,
-                humedad_max: parseFloat(document.getElementById('cfg-hum-max').value) || null,
-                ruido_max: parseFloat(document.getElementById('cfg-ruido-max').value) || null,
-                indice_sueno_min: parseFloat(document.getElementById('cfg-ics-min').value) || null
+                temp_min: parseFloat(document.getElementById('temp_min').value) || null,
+                temp_max: parseFloat(document.getElementById('temp_max').value) || null,
+                hum_min: parseFloat(document.getElementById('hum_min').value) || null,
+                hum_max: parseFloat(document.getElementById('hum_max').value) || null,
+                ruido_max: parseFloat(document.getElementById('ruido_max').value) || null,
+                mov_max: parseInt(document.getElementById('mov_max').value) || null
             };
 
             const response = await fetch(`${API_BASE}/config/umbrales`, {

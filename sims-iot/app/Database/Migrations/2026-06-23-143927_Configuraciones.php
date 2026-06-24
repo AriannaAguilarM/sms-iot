@@ -1,59 +1,81 @@
 <?php
 
-namespace App\Database\Migrations;
+namespace App\Models;
 
-use CodeIgniter\Database\Migration;
+use CodeIgniter\Model;
 
-class Configuraciones extends Migration
+class ConfiguracionModel extends Model
 {
-    public function up()
+    protected $table            = 'configuraciones';
+    protected $primaryKey       = 'id';
+    protected $useAutoIncrement = true;
+    protected $returnType       = 'array';
+    protected $useSoftDeletes   = false;
+    protected $protectFields    = true;
+    protected $allowedFields    = [
+        'temp_min', 'temp_max', 'hum_min', 'hum_max', 
+        'ruido_max', 'mov_max'
+    ];
+
+    protected $useTimestamps = false;
+
+    /**
+     * Obtener todos los umbrales (siempre debe haber un registro)
+     */
+    public function getUmbrales()
     {
-        $this->forge->addField([
-
-            'id' => [
-                'type'           => 'INT',
-                'unsigned'       => true,
-                'auto_increment' => true,
-            ],
-
-            'temp_min' => [
-                'type'    => 'FLOAT',
-                'default' => 18,
-            ],
-
-            'temp_max' => [
-                'type'    => 'FLOAT',
-                'default' => 24,
-            ],
-
-            'hum_min' => [
-                'type'    => 'FLOAT',
-                'default' => 40,
-            ],
-
-            'hum_max' => [
-                'type'    => 'FLOAT',
-                'default' => 60,
-            ],
-
-            'ruido_max' => [
-                'type'    => 'FLOAT',
-                'default' => 40,
-            ],
-
-            'mov_max' => [
-                'type'    => 'INT',
-                'default' => 10,
-            ],
-
-        ]);
-
-        $this->forge->addKey('id', true);
-        $this->forge->createTable('configuraciones');
+        $config = $this->first();
+        
+        if (!$config) {
+            // Si no existe, crear configuración por defecto
+            $defaults = [
+                'temp_min' => 18,
+                'temp_max' => 26,
+                'hum_min' => 30,
+                'hum_max' => 70,
+                'ruido_max' => 40,
+                'mov_max' => 10,
+            ];
+            $this->insert($defaults);
+            return $defaults;
+        }
+        
+        return $config;
     }
 
-    public function down()
+    /**
+     * Guardar umbrales (siempre actualizar el registro #1)
+     */
+    public function guardarUmbrales($data)
     {
-        $this->forge->dropTable('configuraciones');
+        $config = $this->first();
+        
+        if ($config) {
+            return $this->update($config['id'], $data);
+        } else {
+            return $this->insert($data);
+        }
+    }
+
+    /**
+     * Inicializar configuración por defecto
+     */
+    public function inicializar()
+    {
+        $config = $this->first();
+        
+        if (!$config) {
+            $defaults = [
+                'temp_min' => 18,
+                'temp_max' => 26,
+                'hum_min' => 30,
+                'hum_max' => 70,
+                'ruido_max' => 40,
+                'mov_max' => 10,
+            ];
+            $this->insert($defaults);
+            return true;
+        }
+        return false;
     }
 }

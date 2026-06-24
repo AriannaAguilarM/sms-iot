@@ -40,6 +40,9 @@ $routes->group('api', [
     // ── CONFIGURACIÓN (Usuario → ESP32) ───────────────────────────────
     $routes->get('config',              'ConfigController::index');
     $routes->post('config/umbrales',    'ConfigController::actualizarUmbrales');
+    $routes->get('api/config', 'Api\ConfiguracionController::index');
+    $routes->post('api/config/umbrales', 'Api\ConfiguracionController::umbrales');
+    $routes->post('api/config/inicializar', 'Api\ConfiguracionController::inicializar');
 
     // ── Usuarios (ESP32 → API) ─────────────────────────────────────────
     $routes->get('listar', 'Api\UsuariosController::listar');

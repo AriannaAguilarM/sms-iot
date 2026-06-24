@@ -2,117 +2,66 @@
 
 namespace App\Controllers\Api;
 
-use App\Controllers\BaseController;
-use App\Services\AlertaService;
-use CodeIgniter\HTTP\ResponseInterface;
+use CodeIgniter\RESTful\ResourceController;
+use App\Models\ConfiguracionModel;
 
-   
-    class ConfigController extends BaseController
+class ConfiguracionController extends ResourceController
+{
+    protected $modelName = ConfiguracionModel::class;
+    protected $format = 'json';
+
+    /**
+     * Obtener configuración
+     * GET /api/config
+     */
+    public function index()
     {
-        protected AlertaService $alertaService;
+        $config = $this->model->getUmbrales();
+        return $this->respond($config);
+    }
 
-        // Umbrales almacenados en sesión/archivo de configuración
-        private array $umbralesDefault = [
-            'temperatura_max' => 28.0,
-            'temperatura_min' => 16.0,
-            'humedad_max'     => 70.0,
-            'humedad_min'     => 30.0,
-            'ruido_max'       => 40.0,
-        ];
-
-        public function __construct()
-        {
-            $this->alertaService = new AlertaService();
-        }
-
-        public function index(): ResponseInterface
-        {
-            $umbrales = $this->getUmbralesActuales();
-
-            return $this->responder(200, $umbrales);
-        }
-
+    /**
+     * Guardar umbrales
+     * POST /api/config/umbrales
+     */
+    public function umbrales()
+    {
+        $data = $this->request->getJSON(true);
         
-        public function actualizarUmbrales(): ResponseInterface
-    {
-        $json = $this->request->getJSON(true);
-
-        if (empty($json)) {
-            return $this->responder(400, [
-                'status' => 'error',
-                'mensaje' => 'No se recibieron datos JSON.',
-            ]);
-        }
-
-        $db = \Config\Database::connect();
-
-            $data = [];
-
-        if (isset($json['temp_min'])) {
-            $data['temp_min'] = $json['temp_min'];
-        }
-
-        if (isset($json['temp_max'])) {
-            $data['temp_max'] = $json['temp_max'];
-        }
-
-        if (isset($json['hum_min'])) {
-            $data['hum_min'] = $json['hum_min'];
-        }
-
-        if (isset($json['hum_max'])) {
-            $data['hum_max'] = $json['hum_max'];
-        }
-
-        if (isset($json['ruido_max'])) {
-            $data['ruido_max'] = $json['ruido_max'];
-        }
-        if (isset($json['mov_max'])) {
-            $data['mov_max'] = $json['mov_max'];
-        }
-
-            if (empty($data)) {
-                return $this->responder(422, [
-                    'status' => 'error',
-                    'mensaje' => 'No hay campos válidos para actualizar.',
-                ]);
+        // Validar campos permitidos
+        $validFields = ['temp_min', 'temp_max', 'hum_min', 'hum_max', 'ruido_max', 'mov_max'];
+        $filtered = [];
+        
+        foreach ($validFields as $field) {
+            if (isset($data[$field]) && $data[$field] !== null && $data[$field] !== '') {
+                $filtered[$field] = (float)$data[$field];
             }
+        }
+        
+        if (empty($filtered)) {
+            return $this->fail('No se enviaron datos válidos', 400);
+        }
 
-        $db->table('configuraciones')
-            ->where('id', 1)
-            ->update($data);
-
-        return $this->responder(200, [
+        $this->model->guardarUmbrales($filtered);
+        
+        return $this->respond([
             'status' => 'ok',
-            'mensaje' => 'Umbrales actualizados correctamente.',
+            'mensaje' => 'Configuración guardada correctamente',
+            'data' => $this->model->getUmbrales()
         ]);
     }
 
-    private function getUmbralesActuales(): array
+    /**
+     * Inicializar configuración por defecto
+     * POST /api/config/inicializar
+     */
+    public function inicializar()
     {
-        $db = \Config\Database::connect();
-
-        $row = $db->table('configuraciones')->where('id', 1)->get()->getRowArray();
-
-        if (!$row) {
-            return [
-                'temperatura_minima' => 18,
-                'temperatura_maxima' => 28,
-                'humedad_minima' => 30,
-                'humedad_maxima' => 70,
-                'ruido_maximo' => 40,
-                'movimiento_maximo' => 10,
-            ];
-        }
-
-        return $row;
+        $result = $this->model->inicializar();
+        return $this->respond([
+            'status' => 'ok',
+            'mensaje' => $result ? 'Configuración inicializada' : 'La configuración ya existe',
+            'data' => $this->model->getUmbrales()
+        ]);
     }
-
-        private function responder(int $codigo, mixed $data): ResponseInterface
-        {
-            return $this->response
-                ->setStatusCode($codigo)
-                ->setContentType('application/json')
-                ->setJSON($data);
-        }
-    }
+}

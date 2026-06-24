@@ -4,12 +4,6 @@ namespace App\Models;
 
 use CodeIgniter\Model;
 
-/**
- * AlertaModel
- * 
- * Gestiona las alertas generadas automáticamente por el sistema
- * cuando los valores de los sensores superan los umbrales definidos.
- */
 class AlertaModel extends Model
 {
     protected $table            = 'alertas';
@@ -18,60 +12,66 @@ class AlertaModel extends Model
     protected $returnType       = 'array';
     protected $useSoftDeletes   = false;
     protected $protectFields    = true;
-
-    protected $allowedFields = [
-        'mensaje',
-        'nivel',   // 'bajo' | 'medio' | 'alto'
-        'fecha',
-    ];
+    protected $allowedFields    = ['mensaje', 'nivel', 'fecha'];
 
     protected $useTimestamps = false;
-
-    protected $validationRules = [
-        'mensaje' => 'required|min_length[5]|max_length[255]',
-        'nivel'   => 'required|in_list[bajo,medio,alto]',
-    ];
-
-    // ──────────────────────────────────────────────────────────────────────
-    // CONSULTAS PERSONALIZADAS
-    // ──────────────────────────────────────────────────────────────────────
+    protected $dateFormat    = 'datetime';
 
     /**
-     * Obtener alertas recientes ordenadas por fecha descendente.
+     * Obtener alertas con filtros
      */
-    public function getAlertasRecientes(int $limit = 20): array
+    public function getAlertas($limit = 100, $nivel = null, $desde = null, $hasta = null)
     {
-        return $this->orderBy('fecha', 'DESC')
-                    ->limit($limit)
-                    ->findAll();
+        $builder = $this->builder();
+        $builder->orderBy('fecha', 'DESC');
+        
+        if ($nivel && $nivel !== 'todos') {
+            $builder->where('nivel', $nivel);
+        }
+        
+        if ($desde) {
+            $builder->where('fecha >=', $desde);
+        }
+        
+        if ($hasta) {
+            $builder->where('fecha <=', $hasta);
+        }
+        
+        if ($limit) {
+            $builder->limit($limit);
+        }
+        
+        return $builder->get()->getResultArray();
     }
 
-    /**
-     * Eliminar alertas con más de N días de antigüedad.
-     */
-    public function limpiarAnteriores(int $dias = 30): int
+    public function getResumen()
     {
-        $db = \Config\Database::connect();
-
-        $db->query("DELETE FROM alertas WHERE fecha < DATE_SUB(NOW(), INTERVAL {$dias} DAY)");
-
-        return $db->affectedRows();
+        $builder = $this->builder();
+        $builder->select('nivel, COUNT(*) as total');
+        $builder->where('fecha >=', date('Y-m-d H:i:s', strtotime('-30 days')));
+        $builder->groupBy('nivel');
+        $result = $builder->get()->getResultArray();
+        
+        $resumen = ['alto' => 0, 'medio' => 0, 'bajo' => 0];
+        foreach ($result as $row) {
+            if (isset($resumen[$row['nivel']])) {
+                $resumen[$row['nivel']] = (int)$row['total'];
+            }
+        }
+        return $resumen;
     }
 
-    /**
-     * Contar alertas por nivel en las últimas 24 horas.
-     */
-    public function contarPorNivel(): array
+    public function limpiarAntiguas()
     {
-        $db = \Config\Database::connect();
+        return $this->where('fecha <', date('Y-m-d H:i:s', strtotime('-30 days')))->delete();
+    }
 
-        $query = $db->query("
-            SELECT nivel, COUNT(*) AS total
-            FROM alertas
-            WHERE fecha >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
-            GROUP BY nivel
-        ");
-
-        return $query->getResultArray();
+    
+    public function existeAlertaSimilar($tipo, $valor)
+    {
+        $builder = $this->builder();
+        $builder->where('mensaje LIKE', "%{$tipo}%");
+        $builder->where('fecha >=', date('Y-m-d H:i:s', strtotime('-2 hours')));
+        return $builder->countAllResults() > 0;
     }
 }

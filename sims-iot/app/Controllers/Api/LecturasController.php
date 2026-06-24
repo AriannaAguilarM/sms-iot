@@ -2,140 +2,95 @@
 
 namespace App\Controllers\Api;
 
-use App\Controllers\BaseController;
+use CodeIgniter\RESTful\ResourceController;
 use App\Models\LecturaModel;
 use App\Services\AlertaService;
-use CodeIgniter\HTTP\ResponseInterface;
 
-
-class LecturasController extends BaseController
+class LecturasController extends ResourceController
 {
-    protected LecturaModel  $lecturaModel;
-    protected AlertaService $alertaService;
+    protected $modelName = LecturaModel::class;
+    protected $format = 'json';
+    protected $alertaService;
 
     public function __construct()
     {
-        $this->lecturaModel  = new LecturaModel();
         $this->alertaService = new AlertaService();
     }
 
-    // ──────────────────────────────────────────────────────────────────────
-    // POST /api/lecturas
-    // ──────────────────────────────────────────────────────────────────────
-
     /**
-     * Recibe los datos del ESP32 en formato JSON, los valida,
-     * los guarda en la BD y genera alertas automáticamente.
-     *
-     * Body esperado:
-     * {
-     *   "temperatura":  24,
-     *   "humedad":      55,
-     *   "ruido":        35,
-     *   "movimiento":   0,
-     *   "indice_sueno": 87
-     * }
+     * Guardar una nueva lectura (desde ESP32)
+     * POST /api/lecturas
      */
-    public function store(): ResponseInterface
+    public function store()
     {
-        // Leer JSON del body
-        $json = $this->request->getJSON(true);
+        $data = $this->request->getJSON(true);
 
-        if (empty($json)) {
-            return $this->responder(400, [
-                'status'  => 'error',
-                'mensaje' => 'No se recibieron datos JSON válidos.',
-            ]);
+        // Validar datos básicos
+        if (empty($data['temperatura'])) {
+            return $this->fail('La temperatura es requerida', 400);
         }
 
-        // Construir el arreglo con timestamp automático
-        $data = [
-            'temperatura'  => $json['temperatura']  ?? null,
-            'humedad'      => $json['humedad']      ?? null,
-            'ruido'        => $json['ruido']        ?? null,
-            'movimiento'   => $json['movimiento']   ?? null,
-            'indice_sueno' => $json['indice_sueno'] ?? null,
-            'fecha'        => date('Y-m-d H:i:s'),
-        ];
-
-        // Validar con las reglas del modelo
-        if (!$this->lecturaModel->validate($data)) {
-            return $this->responder(422, [
-                'status'  => 'error',
-                'mensaje' => 'Datos inválidos.',
-                'errores' => $this->lecturaModel->errors(),
-            ]);
+        // Insertar lectura
+        if (!$this->model->insert($data)) {
+            return $this->fail($this->model->errors(), 400);
         }
 
-        // Guardar en la base de datos
-        if (!$this->lecturaModel->insert($data)) {
-            return $this->responder(500, [
-                'status'  => 'error',
-                'mensaje' => 'Error interno al guardar la lectura.',
-            ]);
-        }
+        $lecturaId = $this->model->getInsertID();
+        $lectura = $this->model->find($lecturaId);
 
-        // Generar alertas automáticas según los umbrales
-        $alertas = $this->alertaService->evaluarLectura($data);
+        // 🔥 GENERAR ALERTAS AUTOMÁTICAMENTE
+        $alertasGeneradas = $this->alertaService->verificarLectura($lectura);
+        $alertasCount = count(array_filter($alertasGeneradas));
 
-        return $this->responder(201, [
-            'status'        => 'ok',
-            'mensaje'       => 'Lectura registrada',
-            'alertas_total' => count($alertas),
+        return $this->respond([
+            'status' => 'ok',
+            'mensaje' => 'Lectura registrada',
+            'id' => $lecturaId,
+            'alertas_generadas' => $alertasCount
         ]);
     }
 
-    // ──────────────────────────────────────────────────────────────────────
-    // GET /api/lecturas
-    // ──────────────────────────────────────────────────────────────────────
-
     /**
-     * Devuelve todas las lecturas. Soporta filtros opcionales por query string:
-     *   ?limit=50
-     *   ?fecha_inicio=2025-06-01
-     *   ?fecha_fin=2025-06-30
+     * Obtener última lectura
+     * GET /api/lecturas/ultima
      */
-    public function index(): ResponseInterface
+    public function ultima()
     {
-        $limit      = (int)($this->request->getGet('limit')       ?? 50);
-        $fechaInicio = $this->request->getGet('fecha_inicio') ?? null;
-        $fechaFin    = $this->request->getGet('fecha_fin')    ?? null;
-
-        $lecturas = $this->lecturaModel->getLecturasFiltradas($fechaInicio, $fechaFin, $limit);
-
-        return $this->responder(200, $lecturas);
-    }
-
-    // ──────────────────────────────────────────────────────────────────────
-    // GET /api/lecturas/ultima
-    // ──────────────────────────────────────────────────────────────────────
-
-    /**
-     * Devuelve la lectura más reciente (usada por el dashboard en tiempo real).
-     */
-    public function ultima(): ResponseInterface
-    {
-        $ultima = $this->lecturaModel->getUltimaLectura();
-
-        if (!$ultima) {
-            return $this->responder(404, [
-                'status'  => 'error',
-                'mensaje' => 'No hay lecturas disponibles aún.',
-            ]);
+        $lectura = $this->model->orderBy('id', 'DESC')->first();
+        
+        if (!$lectura) {
+            return $this->failNotFound('No hay lecturas disponibles aún.');
         }
 
-        return $this->responder(200, $ultima);
+        return $this->respond($lectura);
     }
 
-    // ──────────────────────────────────────────────────────────────────────
-    // Helper interno
-    // ──────────────────────────────────────────────────────────────────────
-
-    private function responder(int $codigo, mixed $data): ResponseInterface
+    /**
+     * Obtener lecturas con filtros
+     * GET /api/lecturas
+     */
+    public function index()
     {
-        return $this->response
-            ->setStatusCode($codigo)
-            ->setContentType('application/json')
-            ->setJSON($data);
+        $limit = $this->request->getGet('limit') ?? 50;
+        $fechaInicio = $this->request->getGet('fecha_inicio');
+        $fechaFin = $this->request->getGet('fecha_fin');
+
+        $builder = $this->model->builder();
+        $builder->orderBy('id', 'DESC');
+        
+        if ($limit) {
+            $builder->limit((int)$limit);
+        }
+
+        if ($fechaInicio) {
+            $builder->where('fecha >=', $fechaInicio . ' 00:00:00');
+        }
+
+        if ($fechaFin) {
+            $builder->where('fecha <=', $fechaFin . ' 23:59:59');
+        }
+
+        $result = $builder->get()->getResultArray();
+        return $this->respond($result);
     }
 }
