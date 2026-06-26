@@ -5,7 +5,7 @@ namespace App\Controllers\Api;
 use CodeIgniter\RESTful\ResourceController;
 use App\Models\ConfiguracionModel;
 
-class ConfiguracionController extends ResourceController
+class ConfigController extends ResourceController
 {
     protected $modelName = ConfiguracionModel::class;
     protected $format = 'json';
@@ -28,7 +28,7 @@ class ConfiguracionController extends ResourceController
     {
         $data = $this->request->getJSON(true);
         
-        // Validar campos permitidos
+        // ✅ Campos correctos según tu tabla
         $validFields = ['temp_min', 'temp_max', 'hum_min', 'hum_max', 'ruido_max', 'mov_max'];
         $filtered = [];
         

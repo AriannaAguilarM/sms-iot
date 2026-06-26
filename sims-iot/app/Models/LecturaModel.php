@@ -4,12 +4,6 @@ namespace App\Models;
 
 use CodeIgniter\Model;
 
-/**
- * LecturaModel
- * 
- * Gestiona las lecturas del ESP32 en la tabla `lecturas`.
- * Incluye validaciones, consultas de promedios y filtros por fecha.
- */
 class LecturaModel extends Model
 {
     protected $table            = 'lecturas';
@@ -28,56 +22,54 @@ class LecturaModel extends Model
         'fecha',
     ];
 
-    // ─── Timestamps manuales (campo `fecha`) ───────────────────────────────
-    protected $useTimestamps = false;
+    // ✅ TIMESTAMPS AUTOMÁTICOS
+    protected $useTimestamps = true;
+    protected $createdField  = 'fecha';
+    protected $updatedField  = '';
 
     // ─── Reglas de validación ──────────────────────────────────────────────
     protected $validationRules = [
         'temperatura'  => 'required|numeric|greater_than[-50]|less_than[80]',
         'humedad'      => 'required|numeric|greater_than_equal_to[0]|less_than_equal_to[100]',
         'ruido'        => 'required|numeric|greater_than_equal_to[0]|less_than[200]',
-        'movimiento'   => 'required|integer|in_list[0,1]',
+        'movimiento'   => 'required|integer|greater_than_equal_to[0]|less_than_equal_to[100]',  // ✅ CAMBIADO
         'indice_sueno' => 'required|numeric|greater_than_equal_to[0]|less_than_equal_to[100]',
     ];
 
     protected $validationMessages = [
         'temperatura' => [
-            'required'          => 'La temperatura es obligatoria.',
-            'numeric'           => 'La temperatura debe ser un número.',
-            'greater_than'      => 'La temperatura mínima permitida es -50°C.',
-            'less_than'         => 'La temperatura máxima permitida es 80°C.',
+            'required'     => 'La temperatura es obligatoria.',
+            'numeric'      => 'La temperatura debe ser un número.',
+            'greater_than' => 'La temperatura mínima permitida es -50°C.',
+            'less_than'    => 'La temperatura máxima permitida es 80°C.',
         ],
         'humedad' => [
-            'required'               => 'La humedad es obligatoria.',
-            'numeric'                => 'La humedad debe ser un número.',
-            'greater_than_equal_to'  => 'La humedad no puede ser negativa.',
-            'less_than_equal_to'     => 'La humedad no puede superar 100%.',
+            'required'              => 'La humedad es obligatoria.',
+            'numeric'               => 'La humedad debe ser un número.',
+            'greater_than_equal_to' => 'La humedad no puede ser negativa.',
+            'less_than_equal_to'    => 'La humedad no puede superar 100%.',
         ],
         'ruido' => [
-            'required'               => 'El nivel de ruido es obligatorio.',
-            'numeric'                => 'El ruido debe ser un número.',
-            'greater_than_equal_to'  => 'El ruido no puede ser negativo.',
+            'required'              => 'El nivel de ruido es obligatorio.',
+            'numeric'               => 'El ruido debe ser un número.',
+            'greater_than_equal_to' => 'El ruido no puede ser negativo.',
         ],
         'movimiento' => [
-            'required' => 'El campo movimiento es obligatorio.',
-            'integer'  => 'El movimiento debe ser entero.',
-            'in_list'  => 'El movimiento debe ser 0 (sin movimiento) o 1 (detectado).',
+            'required'              => 'El campo movimiento es obligatorio.',
+            'integer'               => 'El movimiento debe ser un número entero.',
+            'greater_than_equal_to' => 'El movimiento no puede ser negativo.',
+            'less_than_equal_to'    => 'El movimiento no puede superar 100.',
         ],
         'indice_sueno' => [
-            'required'               => 'El índice de sueño es obligatorio.',
-            'numeric'                => 'El índice de sueño debe ser un número.',
-            'greater_than_equal_to'  => 'El índice de sueño mínimo es 0.',
-            'less_than_equal_to'     => 'El índice de sueño máximo es 100.',
+            'required'              => 'El índice de sueño es obligatorio.',
+            'numeric'               => 'El índice de sueño debe ser un número.',
+            'greater_than_equal_to' => 'El índice de sueño mínimo es 0.',
+            'less_than_equal_to'    => 'El índice de sueño máximo es 100.',
         ],
     ];
 
-    // ──────────────────────────────────────────────────────────────────────
-    // CONSULTAS PERSONALIZADAS
-    // ──────────────────────────────────────────────────────────────────────
+    // ─── CONSULTAS PERSONALIZADAS ──────────────────────────────────────────
 
-    /**
-     * Obtener promedios globales de todas las lecturas.
-     */
     public function getPromediosGlobales(): array
     {
         return $this->select('
@@ -94,9 +86,6 @@ class LecturaModel extends Model
             ->first();
     }
 
-    /**
-     * Obtener estadísticas agrupadas por día (últimos N días).
-     */
     public function getEstadisticasPorDia(int $dias = 7): array
     {
         $db = \Config\Database::connect();
@@ -119,17 +108,11 @@ class LecturaModel extends Model
         return $query->getResultArray();
     }
 
-    /**
-     * Obtener la lectura más reciente.
-     */
     public function getUltimaLectura(): ?array
     {
         return $this->orderBy('fecha', 'DESC')->first();
     }
 
-    /**
-     * Obtener lecturas con filtro opcional por rango de fechas.
-     */
     public function getLecturasFiltradas(?string $fechaInicio, ?string $fechaFin, int $limit = 100): array
     {
         $builder = $this->orderBy('fecha', 'DESC');

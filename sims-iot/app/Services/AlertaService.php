@@ -25,13 +25,14 @@ class AlertaService
         $config = $this->configuracionModel->getUmbrales();
 
         // Extraer valores
-        $temp = (float)$lectura['temperatura'];
-        $hum = (float)$lectura['humedad'];
-        $ruido = (float)$lectura['ruido'];
-        $ics = (float)$lectura['indice_sueno'];
-        $movimiento = (int)$lectura['movimiento'];
+        $temp = (float)($lectura['temperatura'] ?? 0);
+        $hum = (float)($lectura['humedad'] ?? 0);
+        $ruido = (float)($lectura['ruido'] ?? 0);
+        $ics = (float)($lectura['indice_sueno'] ?? 0);
+        $movimiento = (int)($lectura['movimiento'] ?? 0);
 
-        // 1. Verificar Temperatura (temp_min, temp_max)
+        // ✅ Usar los nombres correctos de la tabla configuraciones
+        // 1. Verificar Temperatura
         if ($temp < $config['temp_min']) {
             $alertasGeneradas[] = $this->crearAlerta(
                 "🌡️ Temperatura baja: {$temp}°C (mínimo: {$config['temp_min']}°C)",
@@ -45,7 +46,7 @@ class AlertaService
             );
         }
 
-        // 2. Verificar Humedad (hum_min, hum_max)
+        // 2. Verificar Humedad
         if ($hum < $config['hum_min']) {
             $alertasGeneradas[] = $this->crearAlerta(
                 "💧 Humedad baja: {$hum}% (mínimo: {$config['hum_min']}%)",
@@ -59,7 +60,7 @@ class AlertaService
             );
         }
 
-        // 3. Verificar Ruido (ruido_max)
+        // 3. Verificar Ruido
         if ($ruido > $config['ruido_max']) {
             $nivel = $ruido > $config['ruido_max'] * 1.5 ? 'alto' : 'medio';
             $alertasGeneradas[] = $this->crearAlerta(
@@ -68,7 +69,7 @@ class AlertaService
             );
         }
 
-        // 4. Verificar Movimiento (mov_max)
+        // 4. Verificar Movimiento
         if ($movimiento > $config['mov_max']) {
             $nivel = $movimiento > $config['mov_max'] * 2 ? 'alto' : 'medio';
             $alertasGeneradas[] = $this->crearAlerta(

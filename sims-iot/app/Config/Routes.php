@@ -16,37 +16,34 @@ $routes->get('configuracion', 'Home::configuracion');
 $routes->get('usuarios', 'Home::usuarios');
 $routes->get('acerca', 'Home::acerca');
 
-
 $routes->group('api', [
     'namespace' => 'App\Controllers\Api',
-    'filter'    => 'cors',           // Aplica CORS a todos los endpoints
+    'filter'    => 'cors',
 ], function ($routes) {
 
-    // ── LECTURAS (ESP32 → API) ─────────────────────────────────────────
+    // ── LECTURAS ─────────────────────────────────────────
     $routes->post('lecturas',        'LecturasController::store');
     $routes->get('lecturas/ultima',  'LecturasController::ultima');
     $routes->get('lecturas',         'LecturasController::index');
 
-    // ── ESTADÍSTICAS (Dashboard) ───────────────────────────────────────
+    // ── ESTADÍSTICAS ───────────────────────────────────────
     $routes->get('promedios',              'EstadisticasController::promedios');
     $routes->get('estadisticas/semana',    'EstadisticasController::semana');
     $routes->get('estadisticas/hoy',       'EstadisticasController::hoy');
 
-    // ── ALERTAS (Dashboard + Sistema) ─────────────────────────────────
+    // ── ALERTAS ──────────────────────────────────────────
     $routes->get('alertas/resumen',    'AlertasController::resumen');
     $routes->get('alertas',            'AlertasController::index');
     $routes->delete('alertas/limpiar', 'AlertasController::limpiar');
 
-    // ── CONFIGURACIÓN (Usuario → ESP32) ───────────────────────────────
+    // ── CONFIGURACIÓN (ConfigController) ────────────────────
     $routes->get('config',              'ConfigController::index');
-    $routes->post('config/umbrales',    'ConfigController::actualizarUmbrales');
-    $routes->get('api/config', 'Api\ConfiguracionController::index');
-    $routes->post('api/config/umbrales', 'Api\ConfiguracionController::umbrales');
-    $routes->post('api/config/inicializar', 'Api\ConfiguracionController::inicializar');
+    $routes->post('config/umbrales',    'ConfigController::umbrales');
+    $routes->post('config/inicializar', 'ConfigController::inicializar');
 
-    // ── Usuarios (ESP32 → API) ─────────────────────────────────────────
-    $routes->get('listar', 'Api\UsuariosController::listar');
-    $routes->post('crear', 'Api\UsuariosController::crear');
-    $routes->put('editar/(:num)', 'Api\UsuariosController::editar/$1');
-    $routes->delete('eliminar/(:num)', 'Api\UsuariosController::eliminar/$1');
+    // ── USUARIOS ─────────────────────────────────────────
+    $routes->get('usuarios/listar',    'UsuariosController::listar');
+    $routes->post('usuarios/crear',    'UsuariosController::crear');
+    $routes->put('usuarios/editar/(:num)', 'UsuariosController::editar/$1');
+    $routes->delete('usuarios/eliminar/(:num)', 'UsuariosController::eliminar/$1');
 });

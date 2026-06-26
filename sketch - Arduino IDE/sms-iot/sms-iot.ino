@@ -1,523 +1,623 @@
-/*
- * ============================================================
- * PROYECTO: Sistema de Monitoreo del Sueño IoT
- * VERSIÓN: 1.0.0
- * ============================================================
- * 
- * SENSORES:
- * - DHT11 (Temperatura y Humedad) - GPIO4
- * - KY-038 (Sonido) - GPIO34 (AO)
- * - SW-420 (Vibración/Movimiento) - GPIO14
-========================================================
- */
-
-#include <WiFi.h>
-#include <HTTPClient.h>
-#include <ArduinoJson.h>
-#include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
-#include "DHT.h"
-
-// ============================================================
-//  CONFIGURACIÓN DE PINES
-// ============================================================
-
-// Sensores
-#define PIN_DHT 4
-#define KY038_PIN 34      // Sensor de sonido (AO)
-#define SW420_PIN 14      // Sensor de vibración/movimiento
-
-// LED RGB
-#define LED_R 2
-#define LED_G 15
-#define LED_B 12
-
-// OLED SSD1306 I2C
-#define OLED_SDA 21
-#define OLED_SCL 22
-#define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 64
-#define OLED_ADDRESS 0x3C
-
-// ============================================================
-//  CONFIGURACIÓN DE RED
-// ============================================================
-
-// WiFi
-const char* WIFI_SSID = "TU_WIFI_SSID";
-const char* WIFI_PASS = "TU_WIFI_PASSWORD";
-
-// Servidor API
-const char* API_URL = "http://192.168.1.100:8080/api/lecturas";
-// CAMBIA LA IP POR LA DE TU SERVIDOR
-
-// ============================================================
-//  CONFIGURACIÓN DE SENSORES
-// ============================================================
-
-#define DHTTYPE DHT11
-DHT dht(PIN_DHT, DHTTYPE);
-
-// OLED
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
-
-// ============================================================
-//  VARIABLES GLOBALES
-// ============================================================
-
-// Variables de sensores
-float temperatura = 0;
-float humedad = 0;
-int ruido = 0;
-int movimiento = 0;
-
-// Índice de Calidad del Sueño (ICS)
-int indiceSueno = 0;
-
-// Estado del sistema
-unsigned long lastSendTime = 0;
-const unsigned long SEND_INTERVAL = 5000; // Enviar cada 5 segundos
-bool wifiConnected = false;
-
-// Variables para cálculos
-float tempMin = 99, tempMax = -99;
-float humMin = 99, humMax = -99;
-int ruidoMax = 0;
-int movimientosTotales = 0;
-int contadorLecturas = 0;
-
-// ============================================================
-//  SETUP
-// ============================================================
-
-void setup() {
-  Serial.begin(115200);
-  
-  // Inicializar OLED
-  if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDRESS)) {
-    Serial.println("❌ Error: OLED no encontrado");
-    for (;;);
-  }
-  
-  display.clearDisplay();
-  display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE);
-  display.setCursor(0, 0);
-  display.println("SueñoSmart IoT");
-  display.println("Iniciando...");
-  display.display();
-  delay(2000);
-  
-  // Configurar pines
-  pinMode(SW420_PIN, INPUT);
-  pinMode(LED_R, OUTPUT);
-  pinMode(LED_G, OUTPUT);
-  pinMode(LED_B, OUTPUT);
-  
-  // Inicializar DHT
-  dht.begin();
-  
-  // Inicializar LED RGB
-  setColorRGB(0, 0, 255); // Azul durante inicio
-  delay(1000);
-  
-  // Conectar a WiFi
-  conectarWiFi();
-  
-  // Mostrar estado inicial en OLED
-  mostrarOLED("Inicializado", "Conectando...");
-  
-  Serial.println("========================================");
-  Serial.println("  🌙 SISTEMA DE MONITOREO DEL SUEÑO");
-  Serial.println("========================================");
-  Serial.println("✅ Sistema iniciado");
-  
-  delay(500);
-  setColorRGB(0, 255, 0); // Verde = listo
-}
-
-// ============================================================
-//  LOOP PRINCIPAL
-// ============================================================
-
-void loop() {
-  // 1. Leer sensores
-  leerSensores();
-  
-  // 2. Calcular ICS
-  calcularICS();
-  
-  // 3. Actualizar LED RGB
-  actualizarLED();
-  
-  // 4. Actualizar OLED
-  actualizarOLED();
-  
-  // 5. Enviar datos al servidor
-  if (millis() - lastSendTime >= SEND_INTERVAL) {
-    enviarDatosServidor();
-    lastSendTime = millis();
-  }
-  
-  delay(100);
-}
-
-// ============================================================
-//  FUNCIONES DE SENSORES
-// ============================================================
-
-void leerSensores() {
-  // Leer DHT11
-  float temp = dht.readTemperature();
-  float hum = dht.readHumidity();
-  
-  if (!isnan(temp) && temp > -10 && temp < 60) {
-    temperatura = temp;
-    
-    // Actualizar estadísticas
-    if (temp < tempMin) tempMin = temp;
-    if (temp > tempMax) tempMax = temp;
-  }
-  
-  if (!isnan(hum) && hum >= 0 && hum <= 100) {
-    humedad = hum;
-    
-    if (hum < humMin) humMin = hum;
-    if (hum > humMax) humMax = hum;
-  }
-  
-  // Leer KY-038 (Sonido)
-  // SYM-213 tiene salida analógica de 0-4095 (12 bits)
-  ruido = analogRead(KY038_PIN);
-  if (ruido > ruidoMax) ruidoMax = ruido;
-  
-  // Leer SW-420 (Vibración/Movimiento)
-  // SW-420 entrega HIGH cuando detecta vibración
-  int lecturaMov = digitalRead(SW420_PIN);
-  if (lecturaMov == HIGH) {
-    movimiento = 1;
-    movimientosTotales++;
-  } else {
-    movimiento = 0;
-  }
-  
-  contadorLecturas++;
-  
-  // Serial para depuración
-  Serial.print("🌡️ Temp: "); Serial.print(temperatura);
-  Serial.print("°C | 💧 Hum: "); Serial.print(humedad);
-  Serial.print("% | 🔊 Ruido: "); Serial.print(ruido);
-  Serial.print(" | 🌀 Mov: "); Serial.println(movimiento ? "SI" : "NO");
-}
-
-// ============================================================
-//  CÁLCULO DEL ÍNDICE DE CALIDAD DEL SUEÑO (ICS)
-// ============================================================
-
-void calcularICS() {
   /*
-   * Fórmula del ICS basada en el PSQI (Pittsburgh Sleep Quality Index)
-   * Adaptada para datos objetivos del ESP32
-   */
-  
-  float puntaje = 0;
-  int factores = 0;
-  
-  // 1. Temperatura (18-22°C ideal)
-  if (temperatura >= 18 && temperatura <= 22) {
-    puntaje += 25;  // Excelente
-  } else if (temperatura >= 16 && temperatura <= 24) {
-    puntaje += 15;  // Aceptable
-  } else {
-    puntaje += 5;   // Deficiente
+  * ============================================================
+  * PROYECTO: Sistema Inteligente de Monitoreo del Sueño IoT
+  * VERSIÓN: 1.0.1 - CORREGIDO
+  * ============================================================
+  */
+
+  #include <WiFi.h>
+  #include <HTTPClient.h>
+  #include <ArduinoJson.h>
+  #include <Wire.h>
+  #include <Adafruit_GFX.h>
+  #include <Adafruit_SSD1306.h>
+  #include "DHT.h"
+
+  // ============================================================
+  //  CONFIGURACIÓN DE PINES (SEGÚN PROYECTO)
+  // ============================================================
+
+  // OLED SSD1306 I2C
+  #define OLED_SDA 21
+  #define OLED_SCL 22
+  #define SCREEN_WIDTH 128
+  #define SCREEN_HEIGHT 64
+  #define OLED_ADDRESS 0x3C
+
+  // DHT11
+  #define PIN_DHT 4
+
+  // KY-037 (Sonido) - AO (Salida Analógica)
+  #define SONIDO_PIN 34
+
+  // SW-420 (Vibración/Movimiento)
+  #define SW420_PIN 27
+
+  // LED RGB
+  #define LED_R 25
+  #define LED_G 26
+  #define LED_B 33
+
+  // ============================================================
+  //  CONFIGURACIÓN DHT11
+  // ============================================================
+
+  #define DHTTYPE DHT11
+  DHT dht(PIN_DHT, DHTTYPE);
+
+  // ============================================================
+  //  CONFIGURACIÓN OLED
+  // ============================================================
+
+  Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+  // ============================================================
+  //  CONFIGURACIÓN WIFI
+  // ============================================================
+
+  const char* ssid = "INFINITUM1329_2.4_EXT";
+  const char* password = "FrZfvJJkKg";
+
+  String serverName = "http://192.168.1.101:8080/api/lecturas";
+
+  unsigned long lastTime = 0;
+  const unsigned long timerDelay = 15000;  // 15 segundos
+
+  // ============================================================
+  //  VARIABLES GLOBALES
+  // ============================================================
+
+  float temperatura = 0;
+  float humedad = 0;
+  int ruido = 0;
+  int movimiento = 0;
+  int indiceSueno = 0;
+  bool wifiConectado = false;
+
+  // Contador de intentos fallidos
+  int fallosConsecutivos = 0;
+  const int maxFallos = 5;
+
+  // ============================================================
+  //  FUNCIÓN: CONECTAR WiFi
+  // ============================================================
+
+  void conectarWiFi() {
+    Serial.println();
+    Serial.print("📡 Conectando a WiFi");
+
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(ssid, password);
+
+    int intentos = 0;
+
+    while (WiFi.status() != WL_CONNECTED && intentos < 30) {
+      delay(500);
+      Serial.print(".");
+      intentos++;
+    }
+
+    if (WiFi.status() == WL_CONNECTED) {
+      wifiConectado = true;
+      fallosConsecutivos = 0;
+      Serial.println();
+      Serial.println("=================================");
+      Serial.println("✅ WiFi conectado correctamente");
+      Serial.print("📡 IP ESP32: ");
+      Serial.println(WiFi.localIP());
+      Serial.println("=================================");
+      Serial.println();
+      
+      display.clearDisplay();
+      display.setCursor(0, 0);
+      display.println("✅ WiFi Conectado");
+      display.print("IP: ");
+      display.println(WiFi.localIP());
+      display.display();
+      
+    } else {
+      wifiConectado = false;
+      Serial.println();
+      Serial.println("❌ Error al conectar WiFi");
+      Serial.println("⚠️ Reintentando en 10 segundos...");
+      
+      display.clearDisplay();
+      display.setCursor(0, 0);
+      display.println("❌ WiFi Error");
+      display.println("Reintentando...");
+      display.display();
+      
+      delay(10000);
+      conectarWiFi();
+    }
   }
-  factores++;
-  
-  // 2. Humedad (40-60% ideal)
-  if (humedad >= 40 && humedad <= 60) {
-    puntaje += 25;  // Excelente
-  } else if (humedad >= 30 && humedad <= 70) {
-    puntaje += 15;  // Aceptable
-  } else {
-    puntaje += 5;   // Deficiente
-  }
-  factores++;
-  
-  // 3. Ruido (<30 dB ideal, usando valores analógicos)
-  // Se asume que ruido < 800 es bajo (ajustable)
-  if (ruido < 800) {
-    puntaje += 25;  // Bajo ruido
-  } else if (ruido < 1500) {
-    puntaje += 15;  // Ruido moderado
-  } else {
-    puntaje += 5;   // Ruido alto
-  }
-  factores++;
-  
-  // 4. Movimiento (0 = sin movimiento, ideal)
-  if (movimiento == 0) {
-    puntaje += 25;  // Sin movimiento
-  } else {
-    puntaje += 10;  // Con movimiento
-  }
-  factores++;
-  
-  // Calcular promedio y escalar a 0-100
-  if (factores > 0) {
-    indiceSueno = (int)((puntaje / factores) * 4);
-    indiceSueno = constrain(indiceSueno, 0, 100);
-  } else {
-    indiceSueno = 50;
-  }
-}
 
-// ============================================================
-//  FUNCIONES LED RGB
-// ============================================================
+  // ============================================================
+  //  FUNCIÓN: TEST DE CONEXIÓN AL SERVIDOR
+  // ============================================================
 
-void setColorRGB(int r, int g, int b) {
-  r = constrain(r, 0, 255);
-  g = constrain(g, 0, 255);
-  b = constrain(b, 0, 255);
-  
-  analogWrite(LED_R, r);
-  analogWrite(LED_G, g);
-  analogWrite(LED_B, b);
-}
-
-void actualizarLED() {
-  /*
-   * Verde  → Sueño excelente (ICS >= 80)
-   * Amarillo → Sueño regular (ICS 60-79)
-   * Rojo   → Sueño deficiente (ICS < 60)
-   */
-  
-  if (indiceSueno >= 80) {
-    setColorRGB(0, 255, 0);   // Verde
-  } else if (indiceSueno >= 60) {
-    setColorRGB(255, 255, 0); // Amarillo
-  } else {
-    setColorRGB(255, 0, 0);   // Rojo
-  }
-}
-
-// ============================================================
-//  FUNCIONES OLED
-// ============================================================
-
-void mostrarOLED(String linea1, String linea2) {
-  display.clearDisplay();
-  display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE);
-  display.setCursor(0, 0);
-  display.println("🌙 SueñoSmart IoT");
-  display.println("---------------");
-  display.println(linea1);
-  display.println(linea2);
-  display.display();
-}
-
-void actualizarOLED() {
-  display.clearDisplay();
-  display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE);
-  
-  // Título
-  display.setCursor(0, 0);
-  display.println("🌙 SueñoSmart IoT");
-  
-  // Línea separadora
-  display.drawLine(0, 10, 128, 10, SSD1306_WHITE);
-  
-  // Datos
-  display.setCursor(0, 14);
-  display.print("🌡️ ");
-  display.print(temperatura, 1);
-  display.println(" °C");
-  
-  display.print("💧 ");
-  display.print(humedad, 1);
-  display.println(" %");
-  
-  display.print("🔊 ");
-  display.print(ruido);
-  display.println(" dB");
-  
-  display.print("🌀 ");
-  display.println(movimiento ? "SI" : "NO");
-  
-  // ICS
-  display.setTextSize(2);
-  display.setCursor(0, 48);
-  display.print("ICS: ");
-  display.print(indiceSueno);
-  display.print("/100");
-  
-  display.display();
-}
-
-// ============================================================
-//  FUNCIONES WIFI
-// ============================================================
-
-void conectarWiFi() {
-  Serial.print("📡 Conectando a WiFi...");
-  
-  // Mostrar en OLED
-  display.clearDisplay();
-  display.setCursor(0, 0);
-  display.println("📡 Conectando...");
-  display.println(WIFI_SSID);
-  display.display();
-  
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
-  
-  int intentos = 0;
-  while (WiFi.status() != WL_CONNECTED && intentos < 20) {
-    delay(500);
-    Serial.print(".");
-    intentos++;
+  void testServerConnection() {
+    Serial.println("🔍 Probando conexión al servidor...");
     
-    // Animación en OLED
-    display.setCursor(0, 30);
-    display.print(".");
-    for (int i = 0; i < intentos % 10; i++) display.print(".");
+    WiFiClient client;
+    HTTPClient http;
+    
+    http.begin(client, "http://192.168.1.101:8080/");
+    http.setTimeout(3000);
+    
+    int code = http.GET();
+    Serial.print("📥 Código de respuesta GET raíz: ");
+    Serial.println(code);
+    
+    if (code > 0) {
+      Serial.println("✅ El servidor responde correctamente");
+    } else {
+      Serial.print("❌ Error al conectar: ");
+      Serial.println(http.errorToString(code));
+    }
+    
+    http.end();
+  }
+
+  // ============================================================
+  //  FUNCIÓN: LED RGB
+  // ============================================================
+
+  void setColorRGB(int r, int g, int b) {
+    r = constrain(r, 0, 255);
+    g = constrain(g, 0, 255);
+    b = constrain(b, 0, 255);
+    
+    analogWrite(LED_R, r);
+    analogWrite(LED_G, g);
+    analogWrite(LED_B, b);
+  }
+
+  // ============================================================
+  //  FUNCIÓN: LEER SENSORES
+  // ============================================================
+
+  void leerSensores() {
+    // 1. Leer DHT11 (Temperatura y Humedad)
+    float temp = dht.readTemperature();
+    float hum = dht.readHumidity();
+    
+    if (!isnan(temp) && temp > -10 && temp < 60) {
+      temperatura = temp;
+    } else {
+      Serial.println("⚠️ Error lectura DHT11 (Temperatura)");
+    }
+    
+    if (!isnan(hum) && hum >= 0 && hum <= 100) {
+      humedad = hum;
+    } else {
+      Serial.println("⚠️ Error lectura DHT11 (Humedad)");
+    }
+    
+    // 2. Leer KY-037 (Sonido) - Valor analógico 0-4095
+    ruido = analogRead(SONIDO_PIN);
+    
+    // 3. Leer SW-420 (Movimiento) - HIGH = movimiento detectado
+    int lecturaMov = digitalRead(SW420_PIN);
+    movimiento = (lecturaMov == HIGH) ? 1 : 0;
+  }
+
+  // ============================================================
+  //  FUNCIÓN: CALCULAR ICS
+  // ============================================================
+
+  void calcularICS() {
+    float puntaje = 0;
+    int factores = 0;
+    
+    // 1. Temperatura (18-22°C ideal)
+    if (temperatura >= 18 && temperatura <= 22) {
+      puntaje += 25;
+    } else if (temperatura >= 16 && temperatura <= 24) {
+      puntaje += 15;
+    } else {
+      puntaje += 5;
+    }
+    factores++;
+    
+    // 2. Humedad (40-60% ideal)
+    if (humedad >= 40 && humedad <= 60) {
+      puntaje += 25;
+    } else if (humedad >= 30 && humedad <= 70) {
+      puntaje += 15;
+    } else {
+      puntaje += 5;
+    }
+    factores++;
+    
+    // 3. Ruido (< 500 = silencio)
+    if (ruido < 500) {
+      puntaje += 25;
+    } else if (ruido < 1500) {
+      puntaje += 15;
+    } else {
+      puntaje += 5;
+    }
+    factores++;
+    
+    // 4. Movimiento (0 = sin movimiento = ideal)
+    if (movimiento == 0) {
+      puntaje += 25;
+    } else {
+      puntaje += 10;
+    }
+    factores++;
+    
+    if (factores > 0) {
+      indiceSueno = (int)((puntaje / factores) * 4);
+      indiceSueno = constrain(indiceSueno, 0, 100);
+    } else {
+      indiceSueno = 50;
+    }
+  }
+
+  // ============================================================
+  //  FUNCIÓN: ACTUALIZAR LED
+  // ============================================================
+
+  void actualizarLED() {
+    if (indiceSueno >= 80) {
+      setColorRGB(0, 255, 0);   // 🟢 Verde - Excelente
+    } else if (indiceSueno >= 60) {
+      setColorRGB(255, 255, 0); // 🟡 Amarillo - Regular
+    } else {
+      setColorRGB(255, 0, 0);   // 🔴 Rojo - Deficiente
+    }
+  }
+
+  // ============================================================
+  //  FUNCIÓN: ACTUALIZAR OLED
+  // ============================================================
+
+  void actualizarOLED() {
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    
+    display.setCursor(0, 0);
+    display.println("🌙 SueñoSmart IoT");
+    display.drawLine(0, 10, 128, 10, SSD1306_WHITE);
+    
+    display.setCursor(0, 14);
+    display.print("🌡️ ");
+    display.print(temperatura, 1);
+    display.println(" °C");
+    
+    display.print("💧 ");
+    display.print(humedad, 1);
+    display.println(" %");
+    
+    display.print("🔊 ");
+    display.print(ruido);
+    display.println("");
+    
+    display.print("🌀 ");
+    display.println(movimiento ? "SI" : "NO");
+    
+    display.setTextSize(2);
+    display.setCursor(0, 48);
+    display.print("ICS: ");
+    display.print(indiceSueno);
+    display.print("/100");
+    
     display.display();
   }
-  
-  if (WiFi.status() == WL_CONNECTED) {
-    wifiConnected = true;
-    Serial.println();
-    Serial.println("✅ Conectado a WiFi");
-    Serial.print("📡 IP: ");
-    Serial.println(WiFi.localIP());
-    
-    mostrarOLED("✅ Conectado", "IP: " + WiFi.localIP().toString());
-    delay(1000);
-  } else {
-    wifiConnected = false;
-    Serial.println();
-    Serial.println("❌ Error: No se pudo conectar a WiFi");
-    mostrarOLED("❌ Error WiFi", "Reiniciando...");
-    delay(3000);
-    ESP.restart();
-  }
-}
 
-// ============================================================
-//  FUNCIONES DE ENVÍO DE DATOS (API REST)
-// ============================================================
+  // ============================================================
+  //  FUNCIÓN: MOSTRAR MENSAJE EN OLED
+  // ============================================================
 
-void enviarDatosServidor() {
-  if (!wifiConnected || WiFi.status() != WL_CONNECTED) {
-    Serial.println("⚠️ WiFi no disponible, reconectando...");
-    conectarWiFi();
-    return;
-  }
-  
-  HTTPClient http;
-  http.begin(API_URL);
-  http.addHeader("Content-Type", "application/json");
-  
-  // Crear payload JSON
-  StaticJsonDocument<200> doc;
-  doc["temperatura"] = temperatura;
-  doc["humedad"] = humedad;
-  doc["ruido"] = ruido;
-  doc["movimiento"] = movimiento;
-  doc["indice_sueno"] = indiceSueno;
-  
-  String payload;
-  serializeJson(doc, payload);
-  
-  Serial.println("📤 Enviando datos al servidor...");
-  Serial.println(payload);
-  
-  int httpResponseCode = http.POST(payload);
-  
-  if (httpResponseCode > 0) {
-    String response = http.getString();
-    Serial.print("📥 Respuesta: ");
-    Serial.println(response);
-    
-    if (httpResponseCode == 200 || httpResponseCode == 201) {
-      Serial.println("✅ Datos enviados correctamente");
-    } else {
-      Serial.println("⚠️ Error en el servidor: " + String(httpResponseCode));
+  void mostrarMensajeOLED(String linea1, String linea2 = "") {
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(0, 0);
+    display.println(linea1);
+    if (linea2 != "") {
+      display.println(linea2);
     }
-  } else {
-    Serial.println("❌ Error HTTP: " + String(httpResponseCode));
+    display.display();
   }
-  
-  http.end();
-}
 
-// ============================================================
-//  FUNCIONES DE REPORTE
-// ============================================================
+  // ============================================================
+  //  FUNCIÓN: ENVIAR DATOS AL SERVIDOR (CORREGIDA)
+  // ============================================================
 
-void generarReporte() {
-  Serial.println("========================================");
-  Serial.println("  📊 REPORTE DE LA NOCHE");
-  Serial.println("========================================");
-  Serial.print("🌡️ Temperatura: ");
-  Serial.print(tempMin); Serial.print("°C - ");
-  Serial.print(tempMax); Serial.println("°C");
-  
-  Serial.print("💧 Humedad: ");
-  Serial.print(humMin); Serial.print("% - ");
-  Serial.print(humMax); Serial.println("%");
-  
-  Serial.print("🔊 Ruido máximo: ");
-  Serial.println(ruidoMax);
-  
-  Serial.print("🌀 Movimientos totales: ");
-  Serial.println(movimientosTotales);
-  
-  Serial.print("📊 ICS promedio: ");
-  Serial.println(indiceSueno);
-  
-  Serial.print("📈 Total de lecturas: ");
-  Serial.println(contadorLecturas);
-  Serial.println("========================================");
-}
+  void enviarDatosServidor() {
+    // Verificar conexión WiFi
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println("⚠️ WiFi desconectado, reconectando...");
+      mostrarMensajeOLED("⚠️ WiFi Error", "Reconectando...");
+      conectarWiFi();
+      return;
+    }
 
-// ============================================================
-//  COMANDOS POR SERIAL
-// ============================================================
+    // Crear documento JSON
+    StaticJsonDocument<200> doc;
+    doc["temperatura"] = temperatura;
+    doc["humedad"] = humedad;
+    doc["ruido"] = ruido;
+    doc["movimiento"] = movimiento;
+    doc["indice_sueno"] = indiceSueno;
+    
+    String payload;
+    serializeJson(doc, payload);
 
-void procesarComandoSerial() {
-  if (!Serial.available()) return;
-  
-  String comando = Serial.readStringUntil('\n');
-  comando.trim();
-  comando.toLowerCase();
-  
-  if (comando == "reporte" || comando == "report") {
-    generarReporte();
-  } else if (comando == "led off") {
-    setColorRGB(0, 0, 0);
-  } else if (comando == "led green") {
+    // Crear conexión HTTP
+    WiFiClient client;
+    HTTPClient http;
+    
+    http.begin(client, serverName);
+    http.addHeader("Content-Type", "application/json");
+    
+    // ✅ AUMENTAR TIMEOUT a 10 segundos
+    http.setTimeout(10000);
+
+    Serial.println();
+    Serial.println("========== ENVIANDO DATOS ==========");
+    Serial.println("📤 Payload:");
+    Serial.println(payload);
+
+    mostrarMensajeOLED("📤 Enviando...", "ICS: " + String(indiceSueno));
+
+    // Medir tiempo de respuesta
+    unsigned long startTime = millis();
+    int httpResponseCode = http.POST(payload);
+    unsigned long endTime = millis();
+
+    Serial.print("📥 Código HTTP: ");
+    Serial.println(httpResponseCode);
+    Serial.print("⏱️ Tiempo de respuesta: ");
+    Serial.print((endTime - startTime) / 1000.0);
+    Serial.println(" segundos");
+
+    if (httpResponseCode > 0) {
+      String respuesta = http.getString();
+      Serial.println("📥 Respuesta del servidor:");
+      Serial.println(respuesta);
+      
+      if (httpResponseCode == 200 || httpResponseCode == 201) {
+        Serial.println("✅ Datos enviados correctamente");
+        fallosConsecutivos = 0;
+        mostrarMensajeOLED("✅ Datos enviados", "ICS: " + String(indiceSueno));
+        delay(1000);
+      } else {
+        Serial.println("⚠️ Error en el servidor");
+        fallosConsecutivos++;
+        mostrarMensajeOLED("⚠️ Error Servidor", "Código: " + String(httpResponseCode));
+        delay(1000);
+      }
+    } else {
+      Serial.print("❌ Error en POST: ");
+      Serial.println(http.errorToString(httpResponseCode));
+      
+      // Manejo específico de errores
+      if (httpResponseCode == -11) {
+        Serial.println("⚠️ Timeout: El servidor tardó demasiado en responder");
+        Serial.println("💡 Sugerencia: Verifica que el servidor esté funcionando");
+        mostrarMensajeOLED("⏱️ Timeout", "Servidor lento");
+      } else if (httpResponseCode == -1) {
+        Serial.println("⚠️ Error de conexión: No se pudo conectar al servidor");
+        mostrarMensajeOLED("❌ Conexión", "Servidor no disponible");
+      } else {
+        mostrarMensajeOLED("❌ Error HTTP", http.errorToString(httpResponseCode));
+      }
+      
+      fallosConsecutivos++;
+      delay(2000);
+    }
+
+    http.end();
+    Serial.println("=====================================");
+    Serial.println();
+  }
+
+  // ============================================================
+  //  FUNCIÓN: MOSTRAR DATOS EN SERIAL
+  // ============================================================
+
+  void mostrarDatosSerial() {
+    Serial.println("========== LECTURA DE SENSORES ==========");
+    Serial.print("🌡️ Temperatura: ");
+    Serial.print(temperatura, 1);
+    Serial.println(" °C");
+    
+    Serial.print("💧 Humedad: ");
+    Serial.print(humedad, 1);
+    Serial.println(" %");
+    
+    Serial.print("🔊 Ruido: ");
+    Serial.print(ruido);
+    Serial.println(" (0-4095)");
+    
+    Serial.print("🌀 Movimiento: ");
+    Serial.println(movimiento ? "SI" : "NO");
+    
+    Serial.print("⭐ ICS: ");
+    Serial.print(indiceSueno);
+    Serial.println("/100");
+    
+    Serial.print("📊 Calidad: ");
+    if (indiceSueno >= 80) {
+      Serial.println("Excelente 🟢");
+    } else if (indiceSueno >= 60) {
+      Serial.println("Regular 🟡");
+    } else {
+      Serial.println("Deficiente 🔴");
+    }
+    Serial.println("=========================================");
+    Serial.println();
+  }
+
+  // ============================================================
+  //  FUNCIÓN: COMANDOS POR SERIAL
+  // ============================================================
+
+  void procesarComandosSerial() {
+    if (!Serial.available()) return;
+    
+    String comando = Serial.readStringUntil('\n');
+    comando.trim();
+    comando.toLowerCase();
+    
+    if (comando == "info") {
+      mostrarDatosSerial();
+    } else if (comando == "test") {
+      testServerConnection();
+    } else if (comando == "led off") {
+      setColorRGB(0, 0, 0);
+      Serial.println("🔴 LED apagado");
+      mostrarMensajeOLED("🔴 LED OFF", "");
+    } else if (comando == "led green") {
+      setColorRGB(0, 255, 0);
+      Serial.println("🟢 LED verde");
+      mostrarMensajeOLED("🟢 LED Verde", "");
+    } else if (comando == "led yellow") {
+      setColorRGB(255, 255, 0);
+      Serial.println("🟡 LED amarillo");
+      mostrarMensajeOLED("🟡 LED Amarillo", "");
+    } else if (comando == "led red") {
+      setColorRGB(255, 0, 0);
+      Serial.println("🔴 LED rojo");
+      mostrarMensajeOLED("🔴 LED Rojo", "");
+    } else if (comando == "help") {
+      Serial.println();
+      Serial.println("========== COMANDOS DISPONIBLES ==========");
+      Serial.println("  info        - Mostrar datos de sensores");
+      Serial.println("  test        - Probar conexión al servidor");
+      Serial.println("  led off     - Apagar LED");
+      Serial.println("  led green   - LED verde");
+      Serial.println("  led yellow  - LED amarillo");
+      Serial.println("  led red     - LED rojo");
+      Serial.println("  reset       - Reiniciar ESP32");
+      Serial.println("  help        - Mostrar esta ayuda");
+      Serial.println("==========================================");
+      Serial.println();
+      mostrarMensajeOLED("📋 HELP", "Comandos en Serial");
+      delay(1500);
+    } else if (comando == "reset") {
+      Serial.println("🔄 Reiniciando ESP32...");
+      mostrarMensajeOLED("🔄 Reiniciando...", "");
+      delay(1000);
+      ESP.restart();
+    }
+  }
+
+  // ============================================================
+  //  SETUP
+  // ============================================================
+
+  void setup() {
+    Serial.begin(115200);
+    delay(1000);
+
+    Serial.println();
+    Serial.println("========================================");
+    Serial.println("  🌙 SISTEMA DE MONITOREO DEL SUEÑO");
+    Serial.println("  Versión 1.0.1 - CORREGIDO");
+    Serial.println("========================================");
+    Serial.println();
+
+    // ============================================================
+    //  INICIALIZAR OLED
+    // ============================================================
+    
+    Wire.begin(OLED_SDA, OLED_SCL);
+    
+    if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDRESS)) {
+      Serial.println("❌ Error: OLED no encontrado");
+      Serial.println("⚠️ Verifica las conexiones del OLED");
+      for (;;);
+    }
+    
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(0, 0);
+    display.println("🌙 SueñoSmart IoT");
+    display.println("Iniciando...");
+    display.display();
+    
+    Serial.println("✅ OLED inicializado");
+
+    // ============================================================
+    //  CONFIGURAR PINES
+    // ============================================================
+    
+    pinMode(SW420_PIN, INPUT);
+    pinMode(LED_R, OUTPUT);
+    pinMode(LED_G, OUTPUT);
+    pinMode(LED_B, OUTPUT);
+
+    dht.begin();
+
+    // Secuencia de inicio
+    Serial.println("🔵 Iniciando sistema...");
+    setColorRGB(0, 0, 255);
+    mostrarMensajeOLED("🔵 Iniciando...", "SueñoSmart IoT");
+    delay(1000);
+    
+    // Conectar WiFi
+    conectarWiFi();
+
+    // Probar conexión al servidor
+    if (wifiConectado) {
+      testServerConnection();
+    }
+
+    // Secuencia completada
     setColorRGB(0, 255, 0);
-  } else if (comando == "led yellow") {
-    setColorRGB(255, 255, 0);
-  } else if (comando == "led red") {
-    setColorRGB(255, 0, 0);
-  } else if (comando == "help") {
-    Serial.println("Comandos disponibles:");
-    Serial.println("  reporte     - Mostrar reporte");
-    Serial.println("  led off     - Apagar LED");
-    Serial.println("  led green   - LED verde");
-    Serial.println("  led yellow  - LED amarillo");
-    Serial.println("  led red     - LED rojo");
-    Serial.println("  reset       - Reiniciar estadísticas");
-  } else if (comando == "reset") {
-    tempMin = 99; tempMax = -99;
-    humMin = 99; humMax = -99;
-    ruidoMax = 0;
-    movimientosTotales = 0;
-    contadorLecturas = 0;
-    Serial.println("✅ Estadísticas reiniciadas");
+    mostrarMensajeOLED("✅ Sistema Listo", "ICS: --/100");
+    delay(500);
+    
+    Serial.println();
+    Serial.println("✅ Sistema listo");
+    Serial.println("========================================");
+    Serial.println();
+    Serial.println("📋 Escribe 'help' para ver los comandos disponibles");
+    Serial.println("📋 Escribe 'test' para probar la conexión al servidor");
+    Serial.println();
   }
-}
+
+  // ============================================================
+  //  LOOP PRINCIPAL
+  // ============================================================
+
+  void loop() {
+    // 1. Procesar comandos por Serial
+    procesarComandosSerial();
+
+    // 2. Verificar y reconectar WiFi si es necesario
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println("⚠️ WiFi desconectado, reconectando...");
+      mostrarMensajeOLED("⚠️ WiFi Error", "Reconectando...");
+      conectarWiFi();
+    }
+
+    // 3. Si hay demasiados fallos, aumentar el delay
+    if (fallosConsecutivos >= maxFallos) {
+      Serial.println("⚠️ Demasiados fallos consecutivos");
+      Serial.println("⏳ Esperando 30 segundos antes de reintentar...");
+      mostrarMensajeOLED("⏳ Esperando...", "Reintento en 30s");
+      delay(30000);
+      fallosConsecutivos = 0;
+    }
+
+    // 4. Lectura de sensores y envío cada 15 segundos
+    if ((millis() - lastTime) > timerDelay) {
+      leerSensores();
+      calcularICS();
+      actualizarLED();
+      actualizarOLED();
+      mostrarDatosSerial();
+      enviarDatosServidor();
+      lastTime = millis();
+    }
+
+    delay(100);
+  }

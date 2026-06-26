@@ -100,9 +100,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const API_BASE = document.querySelector('meta[name="api-base"]')?.content || '/api';
     let historialData = [];
 
-    // ==========================================
-    // FUNCIONES DE UTILIDAD
-    // ==========================================
     function toNumber(value) {
         const num = parseFloat(value);
         return isNaN(num) ? 0 : num;
@@ -123,9 +120,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return { label: 'Deficiente', badge: 'danger' };
     }
 
-    // ==========================================
-    // FETCH HISTORIAL
-    // ==========================================
     async function fetchHistorial() {
         try {
             const limit = document.getElementById('sel-limit')?.value || 50;
@@ -167,9 +161,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // ==========================================
-    // RENDER TABLA
-    // ==========================================
     function renderTable(data) {
         const tbody = document.getElementById('historial-tbody');
         if (!tbody) return;
@@ -201,9 +192,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }).join('');
     }
 
-    // ==========================================
-    // EXPORTAR CSV
-    // ==========================================
     function exportCSV() {
         const data = historialData;
         if (!data || data.length === 0) {
@@ -230,9 +218,6 @@ document.addEventListener('DOMContentLoaded', function() {
         showFlash('✅ CSV exportado correctamente.', 'success');
     }
 
-    // ==========================================
-    // FLASH MESSAGES
-    // ==========================================
     function showFlash(msg, type = 'info') {
         let c = document.getElementById('flash-messages');
         if (!c) {
@@ -252,26 +237,19 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 4000);
     }
 
-    // ==========================================
-    // EVENTOS
-    // ==========================================
     document.getElementById('btn-filtrar')?.addEventListener('click', fetchHistorial);
     document.getElementById('btn-refresh')?.addEventListener('click', fetchHistorial);
     document.getElementById('btn-export-csv')?.addEventListener('click', exportCSV);
     document.getElementById('sel-limit')?.addEventListener('change', fetchHistorial);
     document.getElementById('sel-calidad')?.addEventListener('change', fetchHistorial);
 
-    // Enter para filtrar
     document.querySelectorAll('#fecha-inicio, #fecha-fin').forEach(el => {
         el.addEventListener('keypress', e => {
             if (e.key === 'Enter') fetchHistorial();
         });
     });
 
-    // ==========================================
-    // INICIALIZACIÓN
-    // ==========================================
-    // Establecer fechas por defecto (últimos 7 días)
+ 
     const hoy = new Date();
     const hace7dias = new Date();
     hace7dias.setDate(hoy.getDate() - 7);
