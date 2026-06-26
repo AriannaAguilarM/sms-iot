@@ -1,3 +1,52 @@
+# 🌙 SueñoSmart IoT - Sistema Inteligente de Monitoreo del Sueño
+
+---
+
+## 🎯 Descripción del Problema
+
+Actualmente muchas personas presentan **problemas de sueño sin ser conscientes de ello**, lo que afecta su salud física, emocional y rendimiento académico o laboral. Los dispositivos comerciales para monitoreo del sueño suelen ser **costosos** o requieren el uso de **accesorios corporales incómodos**.
+
+Además, **factores ambientales** como la temperatura, humedad, ruido y movimiento durante la noche influyen directamente en la calidad del descanso, pero normalmente no son monitoreados de forma continua.
+
+Por ello surge la necesidad de desarrollar un **sistema inteligente basado en IoT** que permita monitorear las condiciones ambientales del dormitorio y generar recomendaciones para mejorar la calidad del sueño de manera **económica, accesible y no invasiva**.
+
+---
+
+## 🎯 Objetivos
+
+### Objetivo General
+
+Desarrollar un **sistema inteligente basado en IoT** capaz de monitorear las condiciones ambientales y físicas relacionadas con el descanso nocturno para evaluar la calidad del sueño y generar recomendaciones automáticas.
+
+### Objetivos Específicos
+
+- ✅ Medir **temperatura y humedad** ambiental mediante sensores.
+- ✅ Detectar **niveles de ruido** durante la noche.
+- ✅ Registrar **movimientos corporales** nocturnos.
+- ✅ Calcular un **Índice de Calidad del Sueño (ICS)**.
+- ✅ Almacenar los datos en una **base de datos MySQL**.
+- ✅ Mostrar información mediante un **dashboard web**.
+- ✅ Generar **alertas y recomendaciones** automáticas.
+- ✅ Implementar indicadores visuales mediante **LED RGB** y **pantalla OLED**.
+
+---
+
+## 🏗️ Arquitectura del Sistema
+
+![Arquitectura del Sistema](Arquitectura%20del%20Sitema.png)
+
+### Componentes del Sistema
+
+| Componente | Descripción |
+|------------|-------------|
+| **Hardware (ESP32)** | Microcontrolador con sensores y actuadores |
+| **Backend (API REST)** | Servidor con CodeIgniter 4 y PHP 8 |
+| **Base de Datos** | MySQL para almacenar lecturas y alertas |
+| **Frontend (Dashboard)** | Interfaz web con Bootstrap 5 y ECharts |
+
+### Flujo de Datos
+
+ESP32 → POST /api/lecturas → API → Validar → Guardar en BD → Generar Alertas → Dashboard
 
 ---
 
