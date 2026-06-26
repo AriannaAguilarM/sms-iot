@@ -17,20 +17,14 @@ class LecturasController extends ResourceController
         $this->alertaService = new AlertaService();
     }
 
-    /**
-     * Guardar una nueva lectura (desde ESP32)
-     * POST /api/lecturas
-     */
     public function store()
     {
         $data = $this->request->getJSON(true);
 
-        // Validar datos básicos
         if (empty($data['temperatura'])) {
             return $this->fail('La temperatura es requerida', 400);
         }
 
-        // Insertar lectura
         if (!$this->model->insert($data)) {
             return $this->fail($this->model->errors(), 400);
         }
@@ -38,7 +32,6 @@ class LecturasController extends ResourceController
         $lecturaId = $this->model->getInsertID();
         $lectura = $this->model->find($lecturaId);
 
-        // 🔥 GENERAR ALERTAS AUTOMÁTICAMENTE
         $alertasGeneradas = $this->alertaService->verificarLectura($lectura);
         $alertasCount = count(array_filter($alertasGeneradas));
 
@@ -50,10 +43,7 @@ class LecturasController extends ResourceController
         ]);
     }
 
-    /**
-     * Obtener última lectura
-     * GET /api/lecturas/ultima
-     */
+    
     public function ultima()
     {
         $lectura = $this->model->orderBy('id', 'DESC')->first();
@@ -65,10 +55,7 @@ class LecturasController extends ResourceController
         return $this->respond($lectura);
     }
 
-    /**
-     * Obtener lecturas con filtros
-     * GET /api/lecturas
-     */
+    
     public function index()
     {
         $limit = $this->request->getGet('limit') ?? 50;

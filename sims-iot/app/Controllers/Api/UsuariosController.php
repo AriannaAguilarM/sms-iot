@@ -39,7 +39,7 @@ class UsuariosController extends ResourceController
                 return $this->fail('Nombre, correo y contraseña son obligatorios', 400);
             }
             
-            // ✅ Verificar si el correo ya existe
+            // Verificar si el correo ya existe
             if (!$this->model->validarCorreoUnico($data['correo'])) {
                 return $this->fail('Este correo ya está registrado.', 400);
             }
@@ -67,13 +67,12 @@ class UsuariosController extends ResourceController
             
             $data = $this->request->getJSON(true);
             
-            // Verificar que el usuario existe
             $usuario = $this->model->find($id);
             if (!$usuario) {
                 return $this->fail('Usuario no encontrado', 404);
             }
             
-            // ✅ Verificar si el correo ya existe (excluyendo el usuario actual)
+            // Verificar si el correo ya existe (excluyendo el usuario actual)
             if (isset($data['correo']) && !empty($data['correo'])) {
                 // Si el correo no cambió, no validar
                 if ($data['correo'] !== $usuario['correo']) {
@@ -83,7 +82,6 @@ class UsuariosController extends ResourceController
                 }
             }
             
-            // Si no se envía contraseña, eliminarla del array
             if (empty($data['password'])) {
                 unset($data['password']);
             }

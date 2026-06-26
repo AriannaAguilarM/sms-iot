@@ -10,25 +10,18 @@ class ConfigController extends ResourceController
     protected $modelName = ConfiguracionModel::class;
     protected $format = 'json';
 
-    /**
-     * Obtener configuración
-     * GET /api/config
-     */
+    
     public function index()
     {
         $config = $this->model->getUmbrales();
         return $this->respond($config);
     }
 
-    /**
-     * Guardar umbrales
-     * POST /api/config/umbrales
-     */
+    
     public function umbrales()
     {
         $data = $this->request->getJSON(true);
         
-        // ✅ Campos correctos según tu tabla
         $validFields = ['temp_min', 'temp_max', 'hum_min', 'hum_max', 'ruido_max', 'mov_max'];
         $filtered = [];
         
@@ -51,10 +44,7 @@ class ConfigController extends ResourceController
         ]);
     }
 
-    /**
-     * Inicializar configuración por defecto
-     * POST /api/config/inicializar
-     */
+    
     public function inicializar()
     {
         $result = $this->model->inicializar();
