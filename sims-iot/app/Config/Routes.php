@@ -36,14 +36,14 @@ $routes->group('api', [
     $routes->get('alertas',            'AlertasController::index');
     $routes->delete('alertas/limpiar', 'AlertasController::limpiar');
 
-    // ── CONFIGURACIÓN (ConfigController) ────────────────────
+    // ── CONFIGURACIÓN  ────────────────────
     $routes->get('config',              'ConfigController::index');
     $routes->post('config/umbrales',    'ConfigController::umbrales');
     $routes->post('config/inicializar', 'ConfigController::inicializar');
 
     // ── USUARIOS ─────────────────────────────────────────
-    $routes->get('usuarios/listar',    'UsuariosController::listar');
-    $routes->post('usuarios/crear',    'UsuariosController::crear');
+    $routes->get('usuarios/listar',        'UsuariosController::listar');
+    $routes->post('usuarios/crear',        'UsuariosController::crear');
     $routes->put('usuarios/editar/(:num)', 'UsuariosController::editar/$1');
     $routes->delete('usuarios/eliminar/(:num)', 'UsuariosController::eliminar/$1');
 });

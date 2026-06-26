@@ -12,38 +12,61 @@ class UsuarioModel extends Model
     protected $returnType       = 'array';
     protected $useSoftDeletes   = false;
     protected $protectFields    = true;
+    
     protected $allowedFields    = [
         'nombre',
         'correo',
-        'password'];
+        'password'
+    ];
 
-    protected bool $allowEmptyInserts = false;
-    protected bool $updateOnlyChanged = true;
-
-    protected array $casts = [];
-    protected array $castHandlers = [];
-
-    // Dates
     protected $useTimestamps = false;
-    protected $dateFormat    = 'datetime';
-    protected $createdField  = 'created_at';
-    protected $updatedField  = 'updated_at';
-    protected $deletedField  = 'deleted_at';
 
-    // Validation
-    protected $validationRules      = [];
-    protected $validationMessages   = [];
-    protected $skipValidation       = false;
-    protected $cleanValidationRules = true;
+    // ✅ REGLAS DE VALIDACIÓN CORREGIDAS
+    protected $validationRules = [
+        'nombre'   => 'required|min_length[3]|max_length[100]',
+        'correo'   => 'required|valid_email',
+        'password' => 'permit_empty|min_length[6]',
+    ];
 
-    // Callbacks
-    protected $allowCallbacks = true;
-    protected $beforeInsert   = [];
-    protected $afterInsert    = [];
-    protected $beforeUpdate   = [];
-    protected $afterUpdate    = [];
-    protected $beforeFind     = [];
-    protected $afterFind      = [];
-    protected $beforeDelete   = [];
-    protected $afterDelete    = [];
+    // ✅ VALIDACIÓN PERSONALIZADA PARA CORREO ÚNICO
+    protected $validationMessages = [
+        'nombre' => [
+            'required'    => 'El nombre es obligatorio.',
+            'min_length'  => 'El nombre debe tener al menos 3 caracteres.',
+            'max_length'  => 'El nombre no puede tener más de 100 caracteres.',
+        ],
+        'correo' => [
+            'required'    => 'El correo electrónico es obligatorio.',
+            'valid_email' => 'Debes ingresar un correo electrónico válido.',
+        ],
+        'password' => [
+            'min_length' => 'La contraseña debe tener al menos 6 caracteres.',
+        ],
+    ];
+
+    protected $beforeInsert = ['hashPassword'];
+    protected $beforeUpdate = ['hashPassword'];
+
+    protected function hashPassword(array $data)
+    {
+        if (isset($data['data']['password']) && !empty($data['data']['password'])) {
+            $data['data']['password'] = password_hash($data['data']['password'], PASSWORD_DEFAULT);
+        } else {
+            unset($data['data']['password']);
+        }
+        return $data;
+    }
+
+    // ✅ VALIDACIÓN PERSONALIZADA PARA CORREO ÚNICO
+    public function validarCorreoUnico($correo, $id = null)
+    {
+        $builder = $this->builder();
+        $builder->where('correo', $correo);
+        
+        if ($id) {
+            $builder->where('id !=', $id);
+        }
+        
+        return $builder->countAllResults() === 0;
+    }
 }
