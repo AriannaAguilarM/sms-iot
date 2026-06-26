@@ -33,7 +33,7 @@ Desarrollar un **sistema inteligente basado en IoT** capaz de monitorear las con
 
 ## 🏗️ Arquitectura del Sistema
 
-![Arquitectura del Sistema](Arquitectura%20del%20Sitema.png)
+![Arquitectura del Sistema](diagrams/Arquitectura%20del%20Sitema.png)
 
 ### Componentes del Sistema
 
@@ -107,53 +107,49 @@ ESP32 → POST /api/lecturas → API → Validar → Guardar en BD → Generar A
 
 ### Esquema de Conexiones
 
-![Diagrama de Conexiones](Diagrama%20de%20conexiones.png)
+![Diagrama de Conexiones](diagrams/Diagrama%20de%20conexiones.png)
 
 ---
 
-## 📐 Diagramas del Sistema
-
-### Diagrama de Casos de Uso
-
-![Diagrama de Casos de Uso](casos%20de%20uso.png)
-
-*Los actores principales son: Usuario, Administrador, ESP32 y Sistema (Core).*
-
-### Diagrama de Actividad
-
-![Diagrama de Actividad](actividades.png)
-
-*Flujo de actividades del dashboard y consulta de datos.*
-
-### Diagrama de Secuencia
-
-![Diagrama de Secuencia](secuencia.png)
-
-*Comunicación entre ESP32, API, Servicio de Alertas y Base de Datos.*
-
-### Diagrama de Clases
-
-![Diagrama de Clases](clases.png)
-
-*Estructura de clases del sistema MVC.*
-
-### Mapa del Sitio
-
-![Mapa del Sitio](mapa%20del%20sitio.png)
-
-*Navegación del sistema web.*
-
 ### Diseño de Base de Datos
 
-![Diagrama de Base de Datos](BD.png)
+### 🧑‍💻 Tabla: usuarios
+| Campo     | Tipo           | Descripción                          |
+|-----------|----------------|--------------------------------------|
+| id        | INT (PK)       | Identificador único del usuario      |
+| nombre    | VARCHAR(100)   | Nombre del usuario                   |
+| correo    | VARCHAR(100)   | Correo electrónico (único)          |
+| password  | VARCHAR(255)   | Contraseña encriptada               |
 
-*Estructura de las tablas: lecturas, alertas, configuraciones y usuarios.*
+### 🌙 Tabla: lecturas
+| Campo           | Tipo           | Descripción                                      |
+|----------------|----------------|--------------------------------------------------|
+| id             | INT (PK)       | Identificador de la lectura                      |
+| temperatura    | FLOAT          | Temperatura registrada por el sensor            |
+| humedad        | FLOAT          | Nivel de humedad                                 |
+| ruido          | FLOAT          | Nivel de ruido ambiental                         |
+| movimiento     | INT            | Detección de movimiento (0 o 1)                 |
+| indice_sueno   | FLOAT          | Índice calculado de calidad del sueño           |
+| fecha          | DATETIME       | Fecha y hora de la lectura                      |
 
-### Diseño Electrónico
+### 🚨 Tabla: alertas
+| Campo     | Tipo           | Descripción                                      |
+|-----------|----------------|--------------------------------------------------|
+| id        | INT (PK)       | Identificador de la alerta                       |
+| mensaje   | VARCHAR(255)   | Descripción de la alerta                         |
+| nivel     | VARCHAR(50)    | Nivel de severidad (bajo, medio, alto)          |
+| fecha     | DATETIME       | Fecha de generación de la alerta                |
 
-![Diagrama Electrónico](electronico.png)
-
-*Conexiones de componentes electrónicos con ESP32.*
+### ⚙️ Tabla: configuraciones
+| Campo                 | Tipo   | Descripción                                   |
+|----------------------|--------|-----------------------------------------------|
+| id                   | INT    | Identificador de configuración                |
+| temperatura_minima   | FLOAT  | Umbral mínimo de temperatura                  |
+| temperatura_maxima   | FLOAT  | Umbral máximo de temperatura                  |
+| humedad_minima       | FLOAT  | Umbral mínimo de humedad                      |
+| humedad_maxima       | FLOAT  | Umbral máximo de humedad                      |
+| ruido_maximo         | FLOAT  | Nivel máximo permitido de ruido               |
+| movimiento_maximo    | INT    | Máximo de movimientos permitidos              |
 
 ---
 
@@ -161,43 +157,43 @@ ESP32 → POST /api/lecturas → API → Validar → Guardar en BD → Generar A
 
 ### Dashboard Principal
 
-![Dashboard](dashboard.png)
+![Dashboard](dashboard/dashboard.png)
 
 *Vista principal del dashboard con métricas en tiempo real, gauges y gráficas.*
 
 ### Historial de Lecturas
 
-![Historial](historial.png)
+![Historial](dashboard/historial.png)
 
 *Tabla con el historial completo de lecturas, filtros por fecha y exportación a CSV.*
 
 ### Estadísticas
 
-![Estadísticas](estadistica.png)
+![Estadísticas](dashboard/estadistica.png)
 
 *Gráficas de evolución semanal, promedios y resumen del día.*
 
 ### Alertas
 
-![Alertas](alertas.png)
+![Alertas](dashboard/alertas.png)
 
 *Lista de alertas generadas automáticamente con filtros por nivel.*
 
 ### Configuración
 
-![Configuración](configuracion.png)
+![Configuración](dashboard/configuracion.png)
 
 *Configuración de umbrales de alerta para temperatura, humedad, ruido y movimiento.*
 
 ### Usuarios
 
-![Usuarios](usuarios.png)
+![Usuarios](dashboard/usuarios.png)
 
 *Gestión de usuarios del sistema con CRUD completo.*
 
 ### Acerca de
 
-![Acerca de](acerca%20de.png)
+![Acerca de](dashboard/acerca%20de.png)
 
 *Información del proyecto, tecnologías utilizadas y autoría.*
 
@@ -205,30 +201,54 @@ ESP32 → POST /api/lecturas → API → Validar → Guardar en BD → Generar A
 
 ## 🚀 Instalación y Ejecución
 
-### Requisitos Previos
+### 📋 Requisitos Previos
 
-- **XAMPP** (Apache + MySQL) o similar
-- **PHP 8.0 o superior**
-- **Composer** (gestor de dependencias de PHP)
-- **Arduino IDE** (para programar el ESP32)
-- **Git** (opcional, para clonar el repositorio)
+Antes de comenzar, asegúrate de contar con las siguientes herramientas instaladas:
 
-### Paso 1: Clonar el repositorio
+- **XAMPP** (Apache + MySQL) o cualquier servidor compatible.
+- **PHP 8.0 o superior**.
+- **Composer** (gestor de dependencias de PHP).
+- **Arduino IDE** (para programar el ESP32).
+- **Git** (opcional, para clonar el repositorio).
+
+---
+
+### 📥 Paso 1: Clonar el repositorio
+
+Clona el proyecto desde GitHub y accede al directorio:
 
 ```bash
 git clone https://github.com/AriannaAguilarM/sms-iot.git
 cd sms-iot
+```
 
-### Paso 2: Configurar la base de datos
-- Abrir phpMyAdmin (http://localhost/phpmyadmin)
-- Crear una base de datos llamada sims_iot
-- Ejecutar las migraciones:
+---
+
+### 🗄️ Paso 2: Configurar la Base de Datos
+
+1. Abrir **phpMyAdmin**:
+
+   ```
+   http://localhost/phpmyadmin
+   ```
+
+2. Crear una base de datos llamada:
+
+   ```
+   sms_iot
+   ```
+
+3. Ejecutar las migraciones de CodeIgniter:
 
 ```bash
 php spark migrate
+```
 
-### Paso 3: Configurar el archivo .env
-Crear o modificar el archivo .env en la raíz del proyecto:
+---
+
+### ⚙️ Paso 3: Configurar el archivo `.env`
+
+Crear (o modificar) el archivo `.env` ubicado en la raíz del proyecto.
 
 ```env
 CI_ENVIRONMENT = development
@@ -236,32 +256,85 @@ CI_ENVIRONMENT = development
 app.baseURL = 'http://localhost:8080/'
 
 database.default.hostname = localhost
-database.default.database = sims_iot
+database.default.database = sms_iot
 database.default.username = root
-database.default.password = 
+database.default.password =
 database.default.DBDriver = MySQLi
 database.default.port = 3306
+```
 
-### Paso 4: Ejecutar el servidor
+> **Nota:** Verifica que el nombre de la base de datos coincida con la creada en phpMyAdmin.
+
+---
+
+### ▶️ Paso 4: Ejecutar el servidor
+
+Iniciar el servidor de desarrollo de CodeIgniter 4:
+
 ```bash
-php spark serve --host=0.0.0.0 
+php spark serve --host=0.0.0.0
+```
 
-### Paso 5: Configurar el ESP32
-- Abrir Arduino IDE
-- Abrir el archivo sketch/sms-iot.ino
-- Configurar las credenciales WiFi:
+Una vez iniciado, acceder desde el navegador a:
+
+```
+http://localhost:8080
+```
+
+---
+
+### 📡 Paso 5: Configurar el ESP32
+
+1. Abrir **Arduino IDE**.
+2. Abrir el archivo principal del proyecto del ESP32.
+3. Configurar las credenciales de la red Wi-Fi:
 
 ```cpp
 const char* ssid = "TU_WIFI_SSID";
 const char* password = "TU_WIFI_PASSWORD";
-Configurar la URL de la API (IP de tu PC):
+```
+
+4. Configurar la dirección de la API REST (utilizando la dirección IP del equipo donde se ejecuta CodeIgniter):
 
 ```cpp
-String serverName = "http://IP.de.tu.PC:8080/api/lecturas";
+String serverName = "http://IP_DE_TU_PC:8080/api/lecturas";
+```
 
-- Conectar los componentes según el diagrama de conexiones
-- Subir el código al ESP32
+**Ejemplo:**
 
-### Paso 6: Acceder al Dashboard
-- Abrir el navegador y acceder a:
+```cpp
+String serverName = "http://192.168.1.100:8080/api/lecturas";
+```
+
+5. Conectar los sensores y actuadores siguiendo el **diagrama electrónico** del proyecto.
+6. Compilar y cargar el programa al ESP32.
+
+---
+
+### 💻 Paso 6: Acceder al Dashboard Web
+
+Una vez que el servidor esté en ejecución, abrir el navegador y acceder a:
+
+```
 http://localhost:8080/dashboard
+```
+
+Desde el Dashboard será posible:
+
+- 📊 Visualizar las lecturas de los sensores en tiempo real.
+- 📈 Consultar estadísticas del monitoreo del sueño.
+- 🚨 Visualizar alertas generadas por el sistema.
+- ⚙️ Configurar los parámetros de monitoreo.
+- 👤 Administrar los usuarios registrados.
+
+---
+
+## ✅ Verificación de funcionamiento
+
+Si la instalación fue correcta, el sistema deberá cumplir con lo siguiente:
+
+- ✅ La base de datos `sms_iot` contiene todas las tablas creadas mediante las migraciones.
+- ✅ El servidor de CodeIgniter 4 responde correctamente en `http://localhost:8080`.
+- ✅ El ESP32 envía lecturas a la API REST.
+- ✅ Las lecturas se almacenan en la base de datos.
+- ✅ El Dashboard muestra la información actualizada en tiempo real.
