@@ -93,3 +93,21 @@ Desarrollar un **sistema inteligente basado en IoT** capaz de monitorear las con
 ### Esquema de Conexiones
 
 ![alt text](<Diseño sin título (1).png>)
+
+
+### Diagrama de Actividad - Dashboard
+
+Vista del Dashboard
+![alt text](image.png)
+Vista del Historial
+![alt text](image-1.png)
+Vista de Estadística
+![alt text](image-2.png)
+Vista de Alertas
+![alt text](image-3.png)
+Vista de Configuración
+![alt text](image-4.png)
+Vista de Usuarios
+![alt text](image-5.png)
+Vista de Acerca de
+![alt text](image-6.png)
