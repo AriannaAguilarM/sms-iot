@@ -1,37 +1,3 @@
-# 🌙 SueñoSmart IoT - Sistema Inteligente de Monitoreo del Sueño
-
-## 🎯 Descripción del Problema
-
-Actualmente muchas personas presentan **problemas de sueño sin ser conscientes de ello**, lo que afecta su salud física, emocional y rendimiento académico o laboral. Los dispositivos comerciales para monitoreo del sueño suelen ser **costosos** o requieren el uso de **accesorios corporales incómodos**.
-
-Además, **factores ambientales** como la temperatura, humedad, ruido y movimiento durante la noche influyen directamente en la calidad del descanso, pero normalmente no son monitoreados de forma continua.
-
-Por ello surge la necesidad de desarrollar un **sistema inteligente basado en IoT** que permita monitorear las condiciones ambientales del dormitorio y generar recomendaciones para mejorar la calidad del sueño de manera **económica, accesible y no invasiva**.
-
----
-
-## 🎯 Objetivos
-
-### Objetivo General
-
-Desarrollar un **sistema inteligente basado en IoT** capaz de monitorear las condiciones ambientales y físicas relacionadas con el descanso nocturno para evaluar la calidad del sueño y generar recomendaciones automáticas.
-
-### Objetivos Específicos
-
-- ✅ Medir **temperatura y humedad** ambiental mediante sensores.
-- ✅ Detectar **niveles de ruido** durante la noche.
-- ✅ Registrar **movimientos corporales** nocturnos.
-- ✅ Calcular un **Índice de Calidad del Sueño (ICS)**.
-- ✅ Almacenar los datos en una **base de datos MySQL**.
-- ✅ Mostrar información mediante un **dashboard web**.
-- ✅ Generar **alertas y recomendaciones** automáticas.
-- ✅ Implementar indicadores visuales mediante **LED RGB** y **pantalla OLED**.
-
----
-
-## 🏗️ Arquitectura del Sistema
-
-![alt text](<Arquitectura del Sitema.png>)
 
 ---
 
@@ -92,22 +58,161 @@ Desarrollar un **sistema inteligente basado en IoT** capaz de monitorear las con
 
 ### Esquema de Conexiones
 
-![alt text](<Diseño sin título (1).png>)
+![Diagrama de Conexiones](Diagrama%20de%20conexiones.png)
 
+---
 
-### Diagrama de Actividad - Dashboard
+## 📐 Diagramas del Sistema
 
-Vista del Dashboard
-![alt text](image.png)
-Vista del Historial
-![alt text](image-1.png)
-Vista de Estadística
-![alt text](image-2.png)
-Vista de Alertas
-![alt text](image-3.png)
-Vista de Configuración
-![alt text](image-4.png)
-Vista de Usuarios
-![alt text](image-5.png)
-Vista de Acerca de
-![alt text](image-6.png)
+### Diagrama de Casos de Uso
+
+![Diagrama de Casos de Uso](casos%20de%20uso.png)
+
+*Los actores principales son: Usuario, Administrador, ESP32 y Sistema (Core).*
+
+### Diagrama de Actividad
+
+![Diagrama de Actividad](actividades.png)
+
+*Flujo de actividades del dashboard y consulta de datos.*
+
+### Diagrama de Secuencia
+
+![Diagrama de Secuencia](secuencia.png)
+
+*Comunicación entre ESP32, API, Servicio de Alertas y Base de Datos.*
+
+### Diagrama de Clases
+
+![Diagrama de Clases](clases.png)
+
+*Estructura de clases del sistema MVC.*
+
+### Mapa del Sitio
+
+![Mapa del Sitio](mapa%20del%20sitio.png)
+
+*Navegación del sistema web.*
+
+### Diseño de Base de Datos
+
+![Diagrama de Base de Datos](BD.png)
+
+*Estructura de las tablas: lecturas, alertas, configuraciones y usuarios.*
+
+### Diseño Electrónico
+
+![Diagrama Electrónico](electronico.png)
+
+*Conexiones de componentes electrónicos con ESP32.*
+
+---
+
+## 📸 Capturas de Pantalla
+
+### Dashboard Principal
+
+![Dashboard](dashboard.png)
+
+*Vista principal del dashboard con métricas en tiempo real, gauges y gráficas.*
+
+### Historial de Lecturas
+
+![Historial](historial.png)
+
+*Tabla con el historial completo de lecturas, filtros por fecha y exportación a CSV.*
+
+### Estadísticas
+
+![Estadísticas](estadistica.png)
+
+*Gráficas de evolución semanal, promedios y resumen del día.*
+
+### Alertas
+
+![Alertas](alertas.png)
+
+*Lista de alertas generadas automáticamente con filtros por nivel.*
+
+### Configuración
+
+![Configuración](configuracion.png)
+
+*Configuración de umbrales de alerta para temperatura, humedad, ruido y movimiento.*
+
+### Usuarios
+
+![Usuarios](usuarios.png)
+
+*Gestión de usuarios del sistema con CRUD completo.*
+
+### Acerca de
+
+![Acerca de](acerca%20de.png)
+
+*Información del proyecto, tecnologías utilizadas y autoría.*
+
+---
+
+## 🚀 Instalación y Ejecución
+
+### Requisitos Previos
+
+- **XAMPP** (Apache + MySQL) o similar
+- **PHP 8.0 o superior**
+- **Composer** (gestor de dependencias de PHP)
+- **Arduino IDE** (para programar el ESP32)
+- **Git** (opcional, para clonar el repositorio)
+
+### Paso 1: Clonar el repositorio
+
+```bash
+git clone https://github.com/AriannaAguilarM/sms-iot.git
+cd sms-iot
+
+### Paso 2: Configurar la base de datos
+- Abrir phpMyAdmin (http://localhost/phpmyadmin)
+- Crear una base de datos llamada sims_iot
+- Ejecutar las migraciones:
+
+```bash
+php spark migrate
+
+### Paso 3: Configurar el archivo .env
+Crear o modificar el archivo .env en la raíz del proyecto:
+
+```env
+CI_ENVIRONMENT = development
+
+app.baseURL = 'http://localhost:8080/'
+
+database.default.hostname = localhost
+database.default.database = sims_iot
+database.default.username = root
+database.default.password = 
+database.default.DBDriver = MySQLi
+database.default.port = 3306
+
+### Paso 4: Ejecutar el servidor
+```bash
+php spark serve --host=0.0.0.0 
+
+### Paso 5: Configurar el ESP32
+- Abrir Arduino IDE
+- Abrir el archivo sketch/sms-iot.ino
+- Configurar las credenciales WiFi:
+
+```cpp
+const char* ssid = "TU_WIFI_SSID";
+const char* password = "TU_WIFI_PASSWORD";
+Configurar la URL de la API (IP de tu PC):
+
+```cpp
+String serverName = "http://IP.de.tu.PC:8080/api/lecturas";
+
+- Conectar los componentes según el diagrama de conexiones
+- Subir el código al ESP32
+
+### Paso 6: Acceder al Dashboard
+- Abrir el navegador y acceder a:
+http://localhost:8080/dashboard
